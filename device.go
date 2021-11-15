@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/diamondburned/go-buttplug"
 	"github.com/diamondburned/go-buttplug/device"
@@ -199,7 +198,18 @@ func (p *DevicePage) load() {
 	}
 
 	p.battery = newIndicator()
+	p.battery.update(indication{
+		Text:  "Unknown",
+		Icon:  "battery-missing-symbolic",
+		Class: "indicator-unknown",
+	})
+
 	p.rssi = newIndicator()
+	p.rssi.update(indication{
+		Text:  "Unknown",
+		Icon:  "network-wireless-signal-none-symbolic",
+		Class: "indicator-unknown",
+	})
 
 	indicators := gtk.NewBox(gtk.OrientationHorizontal, 0)
 	indicators.AddCSSClass("indicators")
@@ -216,42 +226,50 @@ func (p *DevicePage) load() {
 	p.ScrolledWindow.SetChild(whole)
 }
 
+const batteryUpdateFreq = 10 // seconds
+
 func (p *DevicePage) mapUpdate(widget gtk.Widgetter) {
 	var t glib.SourceHandle
 
 	canRSSI := true
 	canBattery := true
 
+	updateBattery := func() {
+		battery, err := p.Controller.Battery()
+		glib.IdleAdd(func() {
+			p.battery.update(batteryIndication(battery, err == nil))
+
+			var buttplugErr *buttplug.Error
+			if err != nil && errors.As(err, &buttplugErr) {
+				canBattery = false
+			}
+		})
+	}
+
+	updateRSSI := func() {
+		rssi, err := p.Controller.RSSILevel()
+		glib.IdleAdd(func() {
+			p.rssi.update(rssiIndication(rssi, err == nil))
+
+			var buttplugErr *buttplug.Error
+			if err != nil && errors.As(err, &buttplugErr) {
+				canRSSI = false
+			}
+		})
+	}
+
+	updateBattery()
+	updateRSSI()
+
 	w := gtk.BaseWidget(widget)
 	w.ConnectMap(func() {
-		t = glib.TimeoutSecondsAdd(1, func() bool {
-			go func() {
-				var buttplugErr *buttplug.Error
-
-				if canBattery {
-					battery, err := p.Controller.Battery()
-					glib.IdleAdd(func() {
-						p.battery.update(batteryIndication(battery, err == nil))
-					})
-
-					if err != nil {
-						log.Println("cannot get battery:", err)
-						canBattery = !errors.As(err, &buttplugErr)
-					}
-				}
-
-				if canRSSI {
-					rssi, err := p.Controller.RSSILevel()
-					glib.IdleAdd(func() {
-						p.rssi.update(rssiIndication(rssi, err == nil))
-					})
-
-					if err != nil {
-						log.Println("cannot get RSSI level:", err)
-						canRSSI = !errors.As(err, &buttplugErr)
-					}
-				}
-			}()
+		t = glib.TimeoutSecondsAdd(batteryUpdateFreq, func() bool {
+			if canBattery {
+				go updateBattery()
+			}
+			if canRSSI {
+				go updateRSSI()
+			}
 			return true
 		})
 	})
@@ -284,7 +302,6 @@ func newIndicator() *indicator {
 	box := gtk.NewBox(gtk.OrientationHorizontal, 2)
 	box.Append(image)
 	box.Append(label)
-	box.SetVisible(false)
 
 	return &indicator{
 		Box:   box,
@@ -316,13 +333,13 @@ func rssiIndication(rssi float64, ok bool) indication {
 
 	switch {
 	case rssi < -100:
-		return indication{"Weak", "network-cellular-signal-weak", "rssi-weak"}
+		return indication{"Weak", "network-wireless-signal-weak", "rssi-weak"}
 	case rssi < -90:
-		return indication{"Medium", "network-cellular-signal-ok", "rssi-ok"}
+		return indication{"Medium", "network-wireless-signal-ok", "rssi-ok"}
 	case rssi < -80:
-		return indication{"Good", "network-cellular-signal-good", "rssi-good"}
+		return indication{"Good", "network-wireless-signal-good", "rssi-good"}
 	default:
-		return indication{"Excellent", "network-cellular-signal-excellent", "rssi-excellent"}
+		return indication{"Excellent", "network-wireless-signal-excellent", "rssi-excellent"}
 	}
 }
 

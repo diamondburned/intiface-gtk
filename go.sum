@@ -1,6 +1,6 @@
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/diamondburned/go-buttplug v0.0.3-0.20211115052234-519783786938 h1:X7q6XWPmrfGfKDhRM83H90Q62/Qoe3qj5wAzRk8cDPQ=
-github.com/diamondburned/go-buttplug v0.0.3-0.20211115052234-519783786938/go.mod h1:2WnC+qL7dg3vB6Hiv9HuITG/eYFsCQ1CETh1qmLUq1s=
+github.com/diamondburned/go-buttplug v0.0.3 h1:tBRkOMm2GXKWVUOvwnszAGUM4tCF9CUsJyE/PKzlQFY=
+github.com/diamondburned/go-buttplug v0.0.3/go.mod h1:2WnC+qL7dg3vB6Hiv9HuITG/eYFsCQ1CETh1qmLUq1s=
 github.com/diamondburned/gotk4/pkg v0.0.0-20211030212342-7924fff586c3 h1:B4g2J/9L5cCh5ryN55lS2TX+2ttUWioCpQsR6iOpvCk=
 github.com/diamondburned/gotk4/pkg v0.0.0-20211030212342-7924fff586c3/go.mod h1:dJ2gfR0gvBsGg4IteP8aMBq/U5Q9boDw0DP7kAjXTwM=
 github.com/gorilla/websocket v1.4.2 h1:+/TMaTYc4QFitKJxsQ7Yye35DkWvkdLcvGKqM+x0Ufc=

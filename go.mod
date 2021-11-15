@@ -3,7 +3,7 @@ module github.com/diamondburned/intiface-gtk
 go 1.17
 
 require (
-	github.com/diamondburned/go-buttplug v0.0.3-0.20211115052234-519783786938
+	github.com/diamondburned/go-buttplug v0.0.3
 	github.com/diamondburned/gotk4/pkg v0.0.0-20211030212342-7924fff586c3
 )
 

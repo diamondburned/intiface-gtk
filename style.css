@@ -39,7 +39,12 @@
 	margin-right: 8px;
 }
 
-.device-controls slider {
+.device-controls scale > value {
+	margin-top:  -10px;
+	margin-bottom: 5px;
+}
+
+.device-controls scale slider {
 	min-width:  16px;
 	min-height: 16px;
 	margin: -4px;
@@ -47,14 +52,14 @@
 	box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.75);
 }
 
-.device-controls slider,
-.device-controls trough,
-.device-controls highlight {
+.device-controls scale slider,
+.device-controls scale trough,
+.device-controls scale highlight {
 	border-radius: 99px;
 }
 
-.device-controls trough,
-.device-controls highlight {
+.device-controls scale trough,
+.device-controls scale highlight {
 	min-width: 8px;
 }
 
