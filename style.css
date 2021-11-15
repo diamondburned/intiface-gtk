@@ -1,0 +1,72 @@
+.side-revealer {
+	background-color: @theme_base_color;
+}
+
+.devices-stack {
+	transition: linear 100ms filter;
+}
+
+.sidebar-open .devices-stack {
+	filter: blur(10px) brightness(0.65);
+}
+
+.cli-prompt-form > label {
+	padding: 2px 8px;
+}
+
+.cli-prompt-form > button {
+	margin: 8px 0px;
+}
+
+.error-label {
+	padding: 8px 16px;
+}
+
+.device-controls {
+	margin: 8px 4px;
+}
+
+.device-controls > frame > label {
+	margin-left: 0.5em;
+}
+
+.device-controls > frame > box {
+	margin: 0 8px;
+	margin-bottom: 10px;
+}
+
+.device-controls > frame > box > box:not(:last-child) {
+	margin-right: 8px;
+}
+
+.device-controls slider {
+	min-width:  16px;
+	min-height: 16px;
+	margin: -4px;
+	background: @theme_selected_bg_color;
+	box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.75);
+}
+
+.device-controls slider,
+.device-controls trough,
+.device-controls highlight {
+	border-radius: 99px;
+}
+
+.device-controls trough,
+.device-controls highlight {
+	min-width: 8px;
+}
+
+.indicators {
+	margin-top: 6px;
+}
+
+.indicators > *:not(:last-child) {
+	margin-right: 12px;
+}
+
+.indicators image {
+	margin-right:  2px;
+	margin-bottom: 2px;
+}
