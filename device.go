@@ -164,7 +164,7 @@ func (p *DevicePage) load() {
 			motor := motor
 			steps := float64(steps)
 
-			scale := gtk.NewScaleWithRange(gtk.OrientationVertical, 0, 100, steps)
+			scale := gtk.NewScaleWithRange(gtk.OrientationVertical, 0, 100, 100/steps)
 			scale.SetDigits(0)
 			scale.SetInverted(true)
 			scale.SetVExpand(true)
