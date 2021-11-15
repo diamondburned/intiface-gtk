@@ -1,9 +1,6 @@
-<p align="center">
-
 <h1 align="center">intiface-gtk</h1>
-
-![screenshot](.github/screenshot.png)
-
+<p align="center">
+<img src=".github/screenshot.png" alt="screenshot" />
 </p>
 
 [Intiface][intiface]/[buttplug.io][buttplug.io] frontend in GTK4.
