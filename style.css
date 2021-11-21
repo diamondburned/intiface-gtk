@@ -64,7 +64,7 @@
 }
 
 .indicators {
-	margin-top: 6px;
+	margin-left: 4px;
 }
 
 .indicators > *:not(:last-child) {
@@ -74,4 +74,32 @@
 .indicators image {
 	margin-right:  2px;
 	margin-bottom: 2px;
+}
+
+.more {
+	margin: 10px;
+	margin-top: 0;
+}
+
+.more-pattern > stack > box {
+	margin: 0 4px;
+	margin-bottom: 4px;
+}
+
+.pattern-error {
+	margin-bottom: 4px;
+}
+
+.pattern-controls > * {
+	min-height: 0;
+	min-width:  0;
+	padding: 6px;
+}
+
+.pattern-controls > *:first-child {
+	padding: 6px 12px;
+}
+
+.pattern-controls > *:not(:first-child) {
+	margin-left: 5px;
 }

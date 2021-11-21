@@ -18,18 +18,15 @@ import (
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 	"github.com/diamondburned/gotk4/pkg/pango"
+	"github.com/diamondburned/intiface-gtk/internal/app"
+	"github.com/diamondburned/intiface-gtk/internal/ui"
 )
-
-type manager struct {
-	*device.Manager
-	*buttplug.Websocket
-}
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	app := gtk.NewApplication("com.github.diamondburned.intiface-gtk", 0)
+	app := app.Init("com.github.diamondburned.intiface-gtk")
 
 	var w *Window
 	app.ConnectActivate(func() {
@@ -73,7 +70,7 @@ type Window struct {
 type mainContent struct {
 	*gtk.Overlay
 	sidebar *gtk.StackSidebar
-	stack   *DevicesStack
+	stack   *ui.DeviceStack
 }
 
 func NewWindow(ctx context.Context, app *gtk.Application) *Window {
@@ -101,8 +98,8 @@ func NewWindow(ctx context.Context, app *gtk.Application) *Window {
 	}
 }
 
-func (w *Window) Loaded(manager *manager) {
-	stack := NewDevicesStack(manager)
+func (w *Window) Loaded(manager *ui.Manager) {
+	stack := ui.NewDeviceStack(manager)
 
 	sidebar := gtk.NewStackSidebar()
 	sidebar.SetStack(stack.Stack)
@@ -124,7 +121,7 @@ func (w *Window) Loaded(manager *manager) {
 			sidestack.SetVisibleChild(sidebar)
 		}
 	})
-	stack.onDevice()
+	stack.TriggerOnDevice()
 
 	revealer := gtk.NewRevealer()
 	revealer.SetHAlign(gtk.AlignStart)
@@ -256,7 +253,7 @@ func (w *Window) StartLoading() {
 			case *buttplug.ServerInfo:
 				ok = true
 				glib.IdleAdd(func() {
-					w.Loaded(&manager{
+					w.Loaded(&ui.Manager{
 						Manager:   devman,
 						Websocket: ws.Websocket,
 					})
