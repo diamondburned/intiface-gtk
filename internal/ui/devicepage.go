@@ -96,10 +96,10 @@ func (p *DevicePage) loadBody() {
 
 			line := p.sparklines.AddLine()
 			line.SetWidth(2)
-			line.SetColorHash("v", 2<<(motor*8)) // make int variance larger
+			line.SetColorHash("v", 2<<((motor+1)*8)) // make int variance larger
 
 			scale := gtk.NewScaleWithRange(gtk.OrientationVertical, 0, 100, 100/steps)
-			scale.SetDigits(0)
+			scale.SetDigits(2)
 			scale.SetInverted(true)
 			scale.SetVExpand(true)
 			scale.SetValue(0)

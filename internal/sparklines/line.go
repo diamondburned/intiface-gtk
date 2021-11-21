@@ -101,7 +101,7 @@ func (l *Line) Plot(canvas draw.Canvas, plot *plot.Plot) {
 	}
 
 	// updateFirst is true if we have a point that's outside the range.
-	updateFirst := len(l.XYs) > 0 && l.XYs[0].X <= plot.X.Min
+	updateFirst := len(l.XYs) > 1 && l.XYs[0].X <= plot.X.Min
 
 	// Initialize the endpoints if they've never been initialized before.
 	if l.first == (vg.Point{}) {
@@ -138,22 +138,17 @@ func (l *Line) Plot(canvas draw.Canvas, plot *plot.Plot) {
 		Y: vg.Length(pts[i].Y),
 	})
 
-	if len(pts) > 2 {
-		for i = 1; i < len(pts)-2; i++ {
-			xc := (pts[i].X + pts[i+1].X) / 2
-			yc := (pts[i].Y + pts[i+1].Y) / 2
+	for i = 1; i < len(pts)-1; i++ {
+		xc := (pts[i].X + pts[i+1].X) / 2
+		yc := (pts[i].Y + pts[i+1].Y) / 2
 
-			pa.QuadTo(
-				vg.Point{X: vg.Length(pts[i].X), Y: vg.Length(pts[i].Y)},
-				vg.Point{X: vg.Length(xc), Y: vg.Length(yc)},
-			)
-		}
+		pa.QuadTo(
+			vg.Point{X: vg.Length(pts[i].X), Y: vg.Length(pts[i].Y)},
+			vg.Point{X: vg.Length(xc), Y: vg.Length(yc)},
+		)
 	}
 
-	pa.QuadTo(
-		vg.Point{X: vg.Length(pts[i+0].X), Y: vg.Length(pts[i+0].Y)},
-		vg.Point{X: vg.Length(pts[i+1].X), Y: vg.Length(pts[i+1].Y)},
-	)
+	pa.Line(vg.Point{X: vg.Length(pts[i+0].X), Y: vg.Length(pts[i+0].Y)})
 
 	canvas.SetLineStyle(l.LineStyle)
 	canvas.Stroke(pa)
