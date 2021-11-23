@@ -23,6 +23,8 @@ import (
 )
 
 func main() {
+	intiface.EnableConsole = true
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 

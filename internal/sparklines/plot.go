@@ -60,6 +60,46 @@ func NewPlot() *Plot {
 		))
 	})
 
+	startLoop := func() {
+		if p.clockHandle > 0 {
+			glib.SourceRemove(p.clockHandle)
+			p.clockHandle = 0
+		}
+
+		clock := gdk.BaseFrameClock(p.FrameClock())
+
+		fps := clock.Fps()
+		if fps < 1 {
+			return
+		}
+		ms := uint(1)
+		if fps < 1000 {
+			ms = 1000 / uint(fps)
+		}
+
+		p.clockHandle = glib.TimeoutAdd(ms, func() bool {
+			p.InvalidateTime()
+			return true
+		})
+	}
+
+	var updater glib.SignalHandle
+	p.ConnectRealize(func() {
+		clock := gdk.BaseFrameClock(p.FrameClock())
+		updater = clock.ConnectUpdate(startLoop)
+
+		startLoop()
+	})
+	p.ConnectUnrealize(func() {
+		clock := gdk.BaseFrameClock(p.FrameClock())
+		clock.HandlerDisconnect(updater)
+
+		if p.clockHandle > 0 {
+			glib.SourceRemove(p.clockHandle)
+			p.clockHandle = 0
+		}
+	})
+
 	return p
 }
 
@@ -133,34 +173,6 @@ func (p *Plot) SetNeedle(d time.Duration, clr color.Color, width float64) {
 func (p *Plot) SetDuration(d time.Duration) {
 	p.trange = d
 	p.InvalidateTime()
-}
-
-// Start adds a callback into the main event loop to update the plot on an
-// interval.
-func (p *Plot) Start() {
-	if p.clockHandle > 0 {
-		return
-	}
-
-	clock := gdk.BaseFrameClock(p.FrameClock())
-
-	ms := uint(1)
-	if fps := clock.Fps(); fps < 1000 {
-		ms = 1000 / uint(fps)
-	}
-
-	p.clockHandle = glib.TimeoutAdd(ms, func() bool {
-		p.InvalidateTime()
-		return true
-	})
-}
-
-// Stop removes the background callback loop if there's one.
-func (p *Plot) Stop() {
-	if p.clockHandle > 0 {
-		glib.SourceRemove(p.clockHandle)
-		p.clockHandle = 0
-	}
 }
 
 func (p *Plot) invalidateTime() {

@@ -97,9 +97,31 @@
 }
 
 .pattern-controls > *:first-child {
-	padding: 6px 12px;
+	padding: 14px;
 }
 
 .pattern-controls > *:not(:first-child) {
 	margin-left: 5px;
+}
+
+.pattern-browser-body {
+	margin: 8px;
+}
+
+.pattern-browse-row {
+	padding: 8px;
+}
+
+.pattern-tryout-body scale > value {
+	margin-right: -25px;
+}
+
+.pattern-tryout-body button {
+	padding: 12px;
+	min-width:  0;
+	min-height: 0;
+}
+
+.pattern-tryout {
+	padding: 12px;
 }

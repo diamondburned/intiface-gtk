@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/diamondburned/go-lovense/pattern"
@@ -28,45 +29,52 @@ type patternBox struct {
 }
 
 func newPatternBox(page *DevicePage) *patternBox {
-	frame := gtk.NewFrame("Pattern")
-	frame.AddCSSClass("more-pattern")
-	frame.SetLabelAlign(0)
+	b := &patternBox{page: page}
 
-	loadErr := gtk.NewLabel("")
-	loadErr.SetXAlign(0)
-	loadErr.SetWrap(true)
-	loadErr.SetWrapMode(pango.WrapWordChar)
-	loadErr.SetVisible(false)
-	loadErr.AddCSSClass("pattern-error")
+	b.Frame = gtk.NewFrame("Pattern")
+	b.Frame.AddCSSClass("more-pattern")
+	b.Frame.SetLabelAlign(0)
 
-	loadBtn := gtk.NewButtonWithLabel("Load File")
+	b.loadErr = gtk.NewLabel("")
+	b.loadErr.SetXAlign(0)
+	b.loadErr.SetWrap(true)
+	b.loadErr.SetWrapMode(pango.WrapWordChar)
+	b.loadErr.SetVisible(false)
+	b.loadErr.AddCSSClass("pattern-error")
 
-	loadBox := gtk.NewBox(gtk.OrientationVertical, 0)
-	loadBox.AddCSSClass("pattern-loadfile")
-	loadBox.Append(loadErr)
-	loadBox.Append(loadBtn)
-
-	currBox := gtk.NewBox(gtk.OrientationVertical, 0)
-
-	stack := gtk.NewStack()
-	stack.AddChild(currBox)
-	stack.AddChild(loadBox)
-	stack.SetVisibleChild(loadBox)
-	stack.SetTransitionType(gtk.StackTransitionTypeCrossfade)
-
-	b := &patternBox{
-		Frame:   frame,
-		page:    page,
-		stack:   stack,
-		loadErr: loadErr,
-		loadBox: loadBox,
-		currBox: currBox,
-	}
-
-	frame.SetChild(stack)
+	loadBtn := gtk.NewButtonWithLabel("Open")
+	loadBtn.SetHExpand(true)
 	loadBtn.ConnectClicked(b.loadPattern)
 
+	browseBtn := gtk.NewButtonWithLabel("Discover")
+	browseBtn.SetHExpand(true)
+	browseBtn.ConnectClicked(b.browsePatterns)
+
+	actionBox := gtk.NewBox(gtk.OrientationHorizontal, 4)
+	actionBox.Append(loadBtn)
+	actionBox.Append(browseBtn)
+
+	b.loadBox = gtk.NewBox(gtk.OrientationVertical, 0)
+	b.loadBox.AddCSSClass("pattern-loadfile")
+	b.loadBox.Append(b.loadErr)
+	b.loadBox.Append(actionBox)
+
+	b.currBox = gtk.NewBox(gtk.OrientationVertical, 0)
+
+	b.stack = gtk.NewStack()
+	b.stack.AddChild(b.currBox)
+	b.stack.AddChild(b.loadBox)
+	b.stack.SetVisibleChild(b.loadBox)
+	b.stack.SetTransitionType(gtk.StackTransitionTypeCrossfade)
+
+	b.Frame.SetChild(b.stack)
+
 	return b
+}
+
+func (b *patternBox) browsePatterns() {
+	browser := NewPatternBrowser(b.page)
+	browser.Show()
 }
 
 func (b *patternBox) loadPattern() {
@@ -121,15 +129,17 @@ func (b *patternBox) open(path string) {
 			return
 		}
 
+		name := filepath.Base(path)
+
 		glib.IdleAdd(func() {
-			b.setPattern(p)
+			b.setPattern(p, name)
 			b.SetSensitive(true)
 		})
 	}()
 }
 
-func (b *patternBox) setPattern(p *pattern.Pattern) {
-	b.current = newPatternState(b.page, p, b.stop)
+func (b *patternBox) setPattern(p *pattern.Pattern, name string) {
+	b.current = newPatternState(b, p, name)
 	b.currBox.Append(b.current)
 
 	b.stack.SetVisibleChild(b.currBox)
@@ -168,35 +178,31 @@ type patternState struct {
 	*gtk.Box
 	pattern *pattern.Pattern
 	page    *DevicePage
+	player  *patternPlayer
 
-	playDuration string
-	duration     *gtk.Label
-
-	frame  int
-	tickFn gticker.Func
+	duration *gtk.Label
 }
 
-func newPatternState(page *DevicePage, p *pattern.Pattern, stopFn func()) *patternState {
+func newPatternState(b *patternBox, p *pattern.Pattern, name string) *patternState {
 	s := &patternState{
 		pattern: p,
-		page:    page,
+		page:    b.page,
+		player:  newPatternPlayer(b.page, p),
 	}
-	s.playDuration = fmtDuration(p.Interval * time.Duration(len(p.Points)))
-	s.tickFn.D = p.Interval
-	s.tickFn.F = s.tick
+	s.player.F = s.tick
 
 	stop := gtk.NewButtonFromIconName("media-playback-stop-symbolic")
-	stop.ConnectClicked(stopFn)
+	stop.ConnectClicked(b.stop)
 
 	togglePlay := gtk.NewButtonFromIconName("media-playback-start-symbolic")
 	togglePlay.ConnectClicked(func() {
-		if s.tickFn.IsStarted() {
-			s.tickFn.Stop()
+		if s.player.IsStarted() {
+			s.player.Stop()
 			s.page.stopAll()
 			s.RemoveCSSClass("pattern-playing")
 			togglePlay.SetIconName("media-playback-start-symbolic")
 		} else {
-			s.tickFn.Start()
+			s.player.Start()
 			s.AddCSSClass("pattern-playing")
 			togglePlay.SetIconName("media-playback-pause-symbolic")
 		}
@@ -207,27 +213,88 @@ func newPatternState(page *DevicePage, p *pattern.Pattern, stopFn func()) *patte
 	controls.Append(togglePlay)
 	controls.Append(stop)
 
-	s.duration = gtk.NewLabel(s.playDuration)
+	nameLabel := gtk.NewLabel(name)
+	nameLabel.SetXAlign(0)
+	nameLabel.SetEllipsize(pango.EllipsizeEnd)
+	nameLabel.SetTooltipText(name)
+
+	s.duration = gtk.NewLabel(s.player.TotalDuration)
 	s.duration.SetXAlign(0)
 	s.duration.SetHExpand(true)
 
+	infoBox := gtk.NewBox(gtk.OrientationVertical, 0)
+	infoBox.Append(nameLabel)
+	infoBox.Append(s.duration)
+
 	s.Box = gtk.NewBox(gtk.OrientationHorizontal, 0)
-	s.Box.Append(s.duration)
+	s.Box.Append(infoBox)
 	s.Box.Append(controls)
 
 	return s
 }
 
 func (s *patternState) tick() {
-	defer func() {
-		s.frame++
-		if s.frame > len(s.pattern.Points) {
-			s.frame = 0
-		}
-	}()
+	s.player.tick()
 
-	ranges := s.page.ranges
-	points := s.pattern.Points[s.frame]
+	s.duration.SetMarkup(fmt.Sprintf(
+		"<b>%s</b>/%s",
+		fmtDuration(s.player.CurrentDuration()), s.player.TotalDuration,
+	))
+}
+
+func fmtDuration(d time.Duration) string {
+	return fmt.Sprintf("%02d:%02d", d/time.Minute, d%time.Minute/time.Second)
+}
+
+func patternDuration(p *pattern.Pattern) time.Duration {
+	return pointDuration(p, len(p.Points))
+}
+
+func pointDuration(p *pattern.Pattern, i int) time.Duration {
+	return p.Interval * time.Duration(i)
+}
+
+func (s *patternState) detach() {
+	s.player.Stop()
+}
+
+type patternPlayer struct {
+	gticker.Func
+
+	pattern *pattern.Pattern
+	page    *DevicePage
+
+	TotalDuration string
+	Frame         int
+}
+
+func newPatternPlayer(page *DevicePage, pattern *pattern.Pattern) *patternPlayer {
+	p := &patternPlayer{
+		pattern: pattern,
+		page:    page,
+	}
+	p.TotalDuration = fmtDuration(patternDuration(pattern))
+	p.D = pattern.Interval
+	p.F = p.tick
+
+	return p
+}
+
+func (p *patternPlayer) CurrentDuration() time.Duration {
+	return pointDuration(p.pattern, p.Frame)
+}
+
+func (p *patternPlayer) tick() {
+	p.onTick()
+
+	if p.Frame++; p.Frame >= len(p.pattern.Points) {
+		p.Frame = 0
+	}
+}
+
+func (p *patternPlayer) onTick() {
+	ranges := p.page.ranges
+	points := p.pattern.Points[p.Frame]
 	if len(points) == 0 {
 		setRanges(ranges, 0)
 		return
@@ -238,21 +305,7 @@ func (s *patternState) tick() {
 		return
 	}
 
-	for motor, strength := range s.pattern.Points[s.frame] {
+	for motor, strength := range p.pattern.Points[p.Frame] {
 		ranges[motor].SetValue(strength.AsFloat() * 100)
 	}
-
-	d := s.pattern.Interval * time.Duration(s.frame)
-	s.duration.SetMarkup(fmt.Sprintf(
-		"<b>%s</b>/%s",
-		fmtDuration(d), s.playDuration,
-	))
-}
-
-func fmtDuration(d time.Duration) string {
-	return fmt.Sprintf("%02d:%02d", d/time.Minute, d%time.Minute/time.Second)
-}
-
-func (s *patternState) detach() {
-	s.tickFn.Stop()
 }

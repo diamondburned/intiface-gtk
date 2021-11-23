@@ -171,10 +171,6 @@ func (p *DevicePage) loadBelow() {
 	stopAll.SetTooltipText("Stop All")
 	stopAll.ConnectClicked(p.stopAll)
 
-	// patternButton := gtk.NewButtonFromIconName("utilities-system-monitor-symbolic")
-	// patternButton.SetTooltipText("Load Pattern")
-	// patternButton.ConnectClicked(p.loadPattern)
-
 	more := gtk.NewBox(gtk.OrientationVertical, 0)
 	more.AddCSSClass("more")
 	more.Append(newPatternBox(p))
@@ -250,8 +246,6 @@ func (p *DevicePage) mapUpdate(widget gtk.Widgetter) {
 	w := gtk.BaseWidget(widget)
 
 	w.ConnectMap(func() {
-		p.sparklines.Start()
-
 		t = glib.TimeoutSecondsAdd(batteryUpdateFreq, func() bool {
 			p.updateIndicators()
 			p.keepAlive()
@@ -260,8 +254,6 @@ func (p *DevicePage) mapUpdate(widget gtk.Widgetter) {
 	})
 
 	w.ConnectUnmap(func() {
-		p.sparklines.Stop()
-
 		if t > 0 {
 			glib.SourceRemove(t)
 			t = 0
