@@ -301,11 +301,11 @@ func (p *patternPlayer) onTick() {
 	}
 
 	if len(ranges) != len(points) {
-		setRanges(ranges, points[0].AsFloat()*100)
+		setRanges(ranges, points[0].Scale(p.pattern.Version)*100)
 		return
 	}
 
 	for motor, strength := range p.pattern.Points[p.Frame] {
-		ranges[motor].SetValue(strength.AsFloat() * 100)
+		ranges[motor].SetValue(strength.Scale(p.pattern.Version) * 100)
 	}
 }
