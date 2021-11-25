@@ -2,11 +2,9 @@ module github.com/diamondburned/intiface-gtk
 
 go 1.17
 
-replace github.com/diamondburned/go-lovense => ../../go-lovense
-
 require (
 	github.com/diamondburned/go-buttplug v0.0.3
-	github.com/diamondburned/go-lovense v0.0.0-20211122120330-514447409732
+	github.com/diamondburned/go-lovense v0.0.0-20211124112327-919ccd70ecea
 	github.com/diamondburned/gotk4/pkg v0.0.0-20211121034925-b429b945ab5d
 	github.com/diamondburned/vgcairo v0.0.0-20211121084140-bec98bb26e72
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79

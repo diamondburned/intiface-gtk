@@ -109,11 +109,20 @@
 }
 
 .pattern-browse-row {
+	background-color: @theme_base_color;
+	border: 1px solid @borders;
+	margin-bottom: 8px;
+	border-radius: 8px;
 	padding: 8px;
 }
 
+.pattern-tryout-body scale {
+	padding: 0;
+	margin-right: 2em;
+}
+
 .pattern-tryout-body scale > value {
-	margin-right: -25px;
+	margin-left: 10px;
 }
 
 .pattern-tryout-body button {

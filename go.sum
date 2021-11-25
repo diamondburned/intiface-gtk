@@ -9,8 +9,8 @@ github.com/boombuler/barcode v1.0.1/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/diamondburned/go-buttplug v0.0.3 h1:tBRkOMm2GXKWVUOvwnszAGUM4tCF9CUsJyE/PKzlQFY=
 github.com/diamondburned/go-buttplug v0.0.3/go.mod h1:2WnC+qL7dg3vB6Hiv9HuITG/eYFsCQ1CETh1qmLUq1s=
-github.com/diamondburned/go-lovense v0.0.0-20211122120330-514447409732 h1:b+kImmoHuwUg2LxqoYEiYF6TyXMLOELqw6Tys3Fwz5k=
-github.com/diamondburned/go-lovense v0.0.0-20211122120330-514447409732/go.mod h1:6xGKGLhLQR1WlHS9mogdzjH7nkp//dmzLtl3VbmmaLc=
+github.com/diamondburned/go-lovense v0.0.0-20211124112327-919ccd70ecea h1:tBNoWdyzJkMAJFmC20njwd7vApCyc57D+/CRZv9eToY=
+github.com/diamondburned/go-lovense v0.0.0-20211124112327-919ccd70ecea/go.mod h1:6xGKGLhLQR1WlHS9mogdzjH7nkp//dmzLtl3VbmmaLc=
 github.com/diamondburned/gotk4/pkg v0.0.0-20211121034925-b429b945ab5d h1:aqjfoCaOxa4maQxNz8N+Qsb0mE55ziS08Z2EIkK5r6s=
 github.com/diamondburned/gotk4/pkg v0.0.0-20211121034925-b429b945ab5d/go.mod h1:dJ2gfR0gvBsGg4IteP8aMBq/U5Q9boDw0DP7kAjXTwM=
 github.com/diamondburned/vgcairo v0.0.0-20211121084140-bec98bb26e72 h1:Grp0nYaMJ7mgBJC+ODHTx5RqiQGmLhJ6Kxw7g64xVnA=

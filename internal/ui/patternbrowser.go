@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/diamondburned/go-lovense/api"
@@ -65,6 +66,7 @@ func newPatternBrowserBody(page *DevicePage, patterns []api.Pattern) *patternBro
 	body := &patternBrowserBody{}
 	body.listBox = gtk.NewListBox()
 	body.listBox.AddCSSClass("pattern-browser-body")
+	body.listBox.SetSelectionMode(gtk.SelectionBrowse)
 	body.listBox.SetActivateOnSingleClick(true)
 	body.listBox.Connect("row-activated", func(row *gtk.ListBoxRow) {
 		pattern := body.patterns[row.Index()]
@@ -99,7 +101,7 @@ type patternPreview struct {
 	left   *gtk.Box
 	author *gtk.Label
 	name   *gtk.Label
-	date   *gtk.Label
+	meta   *gtk.Label
 
 	right     *gtk.Box
 	length    *components.IconLabel
@@ -112,50 +114,57 @@ var authorAttrs = components.PangoAttrs(
 	pango.NewAttrForegroundAlpha(components.PercentAlpha(0.85)),
 )
 
-func newPatternPreview(page *DevicePage, pattern *api.Pattern) *patternPreview {
+func newPatternPreview(page *DevicePage, apiPattern *api.Pattern) *patternPreview {
 	p := &patternPreview{
 		page:    page,
-		pattern: pattern,
+		pattern: apiPattern,
 	}
 
-	p.author = gtk.NewLabel(pattern.AuthorOrAnon())
+	date := time.UnixMilli(apiPattern.CreatedTime)
+	author := fmt.Sprintf("%s on %s", apiPattern.AuthorOrAnon(), date.Format("02 Jan 2006"))
+
+	p.author = gtk.NewLabel(author)
 	p.author.SetHExpand(true)
 	p.author.SetXAlign(0)
-	p.author.SetTooltipText(p.author.Text())
-	p.author.SetEllipsize(pango.EllipsizeEnd)
+	p.author.SetTooltipText(author)
+	p.author.SetEllipsize(pango.EllipsizeMiddle)
 	p.author.SetAttributes(authorAttrs)
 
-	p.name = gtk.NewLabel(pattern.DecodedName())
+	p.name = gtk.NewLabel(apiPattern.DecodedName())
 	p.name.SetXAlign(0)
 	p.name.SetYAlign(0.5)
 	p.name.SetVExpand(true)
 	p.name.SetTooltipText(p.name.Text())
 	p.name.SetEllipsize(pango.EllipsizeEnd)
 
-	date := time.UnixMilli(pattern.CreatedTime)
-	p.date = gtk.NewLabel(date.Format("02 Jan 2006"))
-	p.date.SetXAlign(0)
-	p.date.SetAttributes(authorAttrs)
-	p.date.SetTooltipText(date.Format(time.ANSIC))
+	meta := fmt.Sprintf("Version %d", apiPattern.Version2)
+	if features := apiPattern.Features(); len(features) > 0 {
+		meta += "; " + stringifyFeatures(features)
+	}
+
+	p.meta = gtk.NewLabel(meta)
+	p.meta.SetXAlign(0)
+	p.meta.SetAttributes(authorAttrs)
+	p.meta.SetTooltipText(date.Format(time.ANSIC))
 
 	p.left = gtk.NewBox(gtk.OrientationVertical, 2)
 	p.left.SetHExpand(true)
 	p.left.Append(p.author)
 	p.left.Append(p.name)
-	p.left.Append(p.date)
+	p.left.Append(p.meta)
 
-	p.length = components.NewIconLabel("alarm-symbolic", pattern.Timer, gtk.PosRight)
-	p.length.SetTooltipText(fmt.Sprintf("Duration: %s", pattern.Timer))
+	p.length = components.NewIconLabel("alarm-symbolic", apiPattern.Timer, gtk.PosRight)
+	p.length.SetTooltipText(fmt.Sprintf("Duration: %s", apiPattern.Timer))
 	p.length.Label.SetXAlign(1)
 	p.length.Label.SetAttributes(authorAttrs)
 
-	favoritesCount := strconv.Itoa(int(pattern.FavoritesCount))
+	favoritesCount := strconv.Itoa(int(apiPattern.FavoritesCount))
 	p.favorites = components.NewIconLabel("emblem-favorite-symbolic", favoritesCount, gtk.PosRight)
 	p.favorites.SetTooltipText(fmt.Sprintf("%s favorites", favoritesCount))
 	p.favorites.Label.SetXAlign(1)
 	p.favorites.Label.SetAttributes(authorAttrs)
 
-	playCount := strconv.Itoa(int(pattern.PlayCount))
+	playCount := strconv.Itoa(int(apiPattern.PlayCount))
 	p.playCount = components.NewIconLabel("folder-download-symbolic", playCount, gtk.PosRight)
 	p.playCount.SetTooltipText(fmt.Sprintf("%s plays", playCount))
 	p.playCount.Label.SetXAlign(1)
@@ -175,6 +184,17 @@ func newPatternPreview(page *DevicePage, pattern *api.Pattern) *patternPreview {
 	p.Box.Append(p.right)
 
 	return p
+}
+
+func stringifyFeatures(feats []pattern.Feature) string {
+	var b strings.Builder
+	for i, feat := range feats {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(feat.String())
+	}
+	return b.String()
 }
 
 func (p *patternPreview) tryout() {
@@ -213,6 +233,10 @@ func newPatternTryout(page *DevicePage, p *api.Pattern) *patternTryout {
 	t.Dialog.SetApplication(app.Require())
 	t.Dialog.SetDefaultSize(400, 100)
 	t.Dialog.SetChild(t.main)
+
+	// TODO: maybe this doesn't have to be a dialog. We can just make the row
+	// collapse or expand by itself, then have the preview lazily loaded right
+	// there. Having dialogs is kind of unmanageable.
 
 	saveAs := t.Dialog.AddButton("Save As", int(gtk.ResponseApply)).(*gtk.Button)
 	saveAs.AddCSSClass("suggested-action")
