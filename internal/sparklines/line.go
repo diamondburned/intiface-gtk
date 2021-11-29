@@ -1,12 +1,12 @@
 package sparklines
 
 import (
-	"fmt"
 	"image/color"
 	"sort"
 	"time"
 
 	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/font"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
@@ -14,9 +14,11 @@ import (
 
 // Line describes a line in a plot.
 type Line struct {
-	plot  *Plot
-	last  vg.Point
-	first vg.Point
+	plot *Plot
+	// last  vg.Point
+	// first vg.Point
+	last  plotter.XY
+	first plotter.XY
 	// XYs is a copy of the points for this line.
 	plotter.XYs
 	// LineStyle is the style of the line connecting the points.
@@ -34,25 +36,34 @@ func NewLine(p *Plot) *Line {
 			Width: 1,
 		},
 		XYs:    make(plotter.XYs, 0, 128), // ~2KB
+		first:  plotter.XY{X: p.X.Min, Y: p.Y.Max},
+		last:   plotter.XY{X: p.X.Max, Y: p.Y.Max},
 		plot:   p,
 		Smooth: true,
 	}
 }
 
+func (l *Line) interpolatePrev() {
+	const threshold = 0.100 // ms
+
+	prev := l.last
+	if len(l.XYs) > 0 {
+		prev = l.XYs[len(l.XYs)-1]
+		if prev.X >= (l.plot.X.Max - threshold) {
+			return
+		}
+	}
+
+	// If the last point is far away, then we can craft a fake point in by
+	// copying the point subtracted by a few milliseconds.
+	prev.X = l.plot.X.Max - threshold
+	l.XYs = append(l.XYs, prev)
+}
+
 // AddPoint adds the given point into the line.
 func (l *Line) AddPoint(pt float64) {
 	l.plot.invalidateTime()
-
-	if len(l.XYs) > 0 {
-		last := l.XYs[len(l.XYs)-1]
-		// If the last point is far away, then we can craft a fake point in by
-		// copying the point subtracted by a few milliseconds.
-		const threshold = 0.050 // ms
-		if last.X < (l.plot.X.Max - threshold) {
-			last.X = l.plot.X.Max - threshold
-			l.XYs = append(l.XYs, last)
-		}
-	}
+	l.interpolatePrev()
 
 	l.XYs = append(l.XYs, plotter.XY{
 		X: l.plot.X.Max,
@@ -93,57 +104,41 @@ func (l *Line) SetColor(clr color.Color) {
 	l.LineStyle.Color = l.plot.mustColor(clr)
 }
 
-// SetColorHash sets the line's color by hashing str.
-func (l *Line) SetColorHash(str ...interface{}) {
-	l.LineStyle.Color = HashColor(fmt.Sprint(str...))
-}
-
 // SetWidth sets the line's width or thickness.
 func (l *Line) SetWidth(w float64) {
 	l.LineStyle.Width = vg.Length(w)
 }
 
+func transformPt(pt plotter.XY, trX, trY func(float64) font.Length) vg.Point {
+	return vg.Point{X: trX(pt.X), Y: trY(pt.Y)}
+}
+
 // Plot plots the line.
 func (l *Line) Plot(canvas draw.Canvas, plot *plot.Plot) {
+	// updateFirst is true if we have a point that's outside the range.
+	// updateFirst := len(l.XYs) > 1 && l.XYs[0].X <= plot.X.Min
+
+	l.first.X = plot.X.Min - l.plot.trange.Seconds()
+	l.last.X = plot.X.Max
+
+	// Save the new endpoints if they're there.
+	if len(l.XYs) > 0 {
+		l.first.Y = l.XYs[0].Y
+		l.last.Y = l.XYs[len(l.XYs)-1].Y
+	}
+
 	// TODO: gonum/interp
 
 	trX, trY := plot.Transforms(&canvas)
 
 	pts := make([]vg.Point, len(l.XYs)+2)
 	for i, p := range l.XYs {
-		pts[i+1].X = trX(p.X)
-		pts[i+1].Y = trY(p.Y)
-	}
-
-	// updateFirst is true if we have a point that's outside the range.
-	updateFirst := len(l.XYs) > 1 && l.XYs[0].X <= plot.X.Min
-
-	// Initialize the endpoints if they've never been initialized before.
-	if l.first == (vg.Point{}) {
-		l.first = vg.Point{
-			X: trX(plot.X.Min),
-			Y: trY(plot.Y.Max),
-		}
-	}
-	if l.last == (vg.Point{}) {
-		l.last = vg.Point{
-			X: trX(plot.X.Max),
-			Y: trY(plot.Y.Max),
-		}
-	}
-
-	// Save the new endpoints if they're there.
-	if len(l.XYs) > 0 {
-		l.last = pts[len(pts)-2]
-		l.last.X = trX(plot.X.Max)
-	}
-	if updateFirst {
-		l.first = pts[1]
+		pts[i+1] = transformPt(p, trX, trY)
 	}
 
 	// Ensure the 2 endpoints.
-	pts[0] = l.first
-	pts[len(pts)-1] = l.last
+	pts[0] = transformPt(l.first, trX, trY)
+	pts[len(pts)-1] = transformPt(l.last, trX, trY)
 
 	var pa vg.Path
 	var i int
@@ -174,8 +169,8 @@ func (l *Line) Plot(canvas draw.Canvas, plot *plot.Plot) {
 			)
 		}
 		pa.Line(vg.Point{
-			X: vg.Length(pts[i+0].X),
-			Y: vg.Length(pts[i+0].Y),
+			X: vg.Length(pts[i].X),
+			Y: vg.Length(pts[i].Y),
 		})
 	}
 

@@ -14,6 +14,19 @@ var (
 	satVal = lightSV
 )
 
+// HexColor returns the color in #XXXXXXXX format.
+func HexColor(c color.Color) string {
+	r, g, b, a := c.RGBA()
+
+	return fmt.Sprintf(
+		"#%02X%02X%02X%02X",
+		uint8(float64(r)/0xFFFF*0xFF),
+		uint8(float64(g)/0xFFFF*0xFF),
+		uint8(float64(b)/0xFFFF*0xFF),
+		uint8(float64(a)/0xFFFF*0xFF),
+	)
+}
+
 // HashColor hashes the given string into a color.RGBA.
 func HashColor(v ...interface{}) color.RGBA64 {
 	hash := fnv.New32()

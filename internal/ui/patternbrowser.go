@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/diamondburned/adaptive"
 	"github.com/diamondburned/go-lovense/api"
 	"github.com/diamondburned/go-lovense/pattern"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
@@ -20,26 +22,26 @@ import (
 
 type PatternBrowser struct {
 	*gtk.Dialog
-	main *components.FailableContent
+	main *adaptive.LoadablePage
 	body *patternBrowserBody
 }
 
 func NewPatternBrowser(page *DevicePage) *PatternBrowser {
-	window := app.Require().ActiveWindow()
-
 	b := &PatternBrowser{}
-
-	b.main = components.NewFailableContent()
+	b.main = adaptive.NewLoadablePage()
 	b.main.SetLoading()
 
-	b.Dialog = gtk.NewDialogWithFlags("Patterns ⁠— Intiface", window, gtk.DialogDestroyWithParent)
+	b.Dialog = gtk.NewDialogWithFlags(
+		"Patterns ⁠— Intiface",
+		app.Require().ActiveWindow(),
+		gtk.DialogDestroyWithParent|gtk.DialogUseHeaderBar,
+	)
 	b.Dialog.AddCSSClass("pattern-browser-dialog")
-	b.Dialog.SetApplication(app.Require())
-	b.Dialog.SetDefaultSize(window.DefaultSize())
+	b.Dialog.SetDefaultSize(350, 500)
 	b.Dialog.SetChild(b.main)
 
 	go func() {
-		client := api.NewPatternClient(api.NewClientContext(b.main))
+		client := api.NewPatternClient(api.NewClientContext(context.TODO()))
 
 		patterns, err := client.Find(1, 50, api.FindRecommendedPatterns)
 		if err != nil {
@@ -59,7 +61,7 @@ func NewPatternBrowser(page *DevicePage) *PatternBrowser {
 type patternBrowserBody struct {
 	*gtk.ScrolledWindow
 	listBox  *gtk.ListBox
-	patterns []*patternPreview
+	patterns []*patternRow
 }
 
 func newPatternBrowserBody(page *DevicePage, patterns []api.Pattern) *patternBrowserBody {
@@ -68,9 +70,14 @@ func newPatternBrowserBody(page *DevicePage, patterns []api.Pattern) *patternBro
 	body.listBox.AddCSSClass("pattern-browser-body")
 	body.listBox.SetSelectionMode(gtk.SelectionBrowse)
 	body.listBox.SetActivateOnSingleClick(true)
+
+	var lastRow *patternRow
 	body.listBox.Connect("row-activated", func(row *gtk.ListBoxRow) {
-		pattern := body.patterns[row.Index()]
-		pattern.tryout()
+		if lastRow != nil {
+			lastRow.reveal.SetRevealChild(false)
+		}
+		lastRow = body.patterns[row.Index()]
+		lastRow.reveal.SetRevealChild(true)
 	})
 
 	body.ScrolledWindow = gtk.NewScrolledWindow()
@@ -78,22 +85,82 @@ func newPatternBrowserBody(page *DevicePage, patterns []api.Pattern) *patternBro
 	body.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
 	body.SetChild(body.listBox)
 
-	body.patterns = make([]*patternPreview, len(patterns))
+	body.patterns = make([]*patternRow, len(patterns))
 	for i := range patterns {
-		p := newPatternPreview(page, &patterns[i])
+		p := newPatternRow(page, &patterns[i])
 		body.patterns[i] = p
-
-		r := gtk.NewListBoxRow()
-		r.AddCSSClass("pattern-browse-row")
-		r.SetChild(p)
-
-		body.listBox.Append(r)
+		body.listBox.Append(p)
 	}
 
 	return body
 }
 
-type patternPreview struct {
+type patternRow struct {
+	*gtk.ListBoxRow
+	main   *gtk.Box
+	info   *patternInfo
+	reveal *gtk.Revealer
+	tryout *patternTryout
+	loaded bool
+}
+
+func newPatternRow(page *DevicePage, apiPattern *api.Pattern) *patternRow {
+	r := &patternRow{}
+	r.info = newPatternInfo(page, apiPattern)
+
+	r.reveal = gtk.NewRevealer()
+	r.reveal.AddCSSClass("pattern-tryout-revealer")
+	r.reveal.SetRevealChild(false)
+	r.reveal.SetTransitionType(gtk.RevealerTransitionTypeSlideDown)
+	r.reveal.Connect("notify::reveal-child", func() {
+		r.load(apiPattern)
+		if !r.reveal.RevealChild() && r.tryout != nil {
+			r.tryout.pause()
+		}
+	})
+
+	r.main = gtk.NewBox(gtk.OrientationVertical, 0)
+	r.main.Append(r.info)
+	r.main.Append(r.reveal)
+
+	r.ListBoxRow = gtk.NewListBoxRow()
+	r.ListBoxRow.SetOverflow(gtk.OverflowHidden)
+	r.ListBoxRow.AddCSSClass("pattern-browse-row")
+	r.ListBoxRow.SetChild(r.main)
+
+	return r
+}
+
+func (r *patternRow) load(apiPattern *api.Pattern) {
+	if r.loaded {
+		return
+	}
+
+	r.loaded = true
+
+	loading := adaptive.NewLoadablePage()
+	loading.SetSizeRequest(-1, 50)
+	loading.ErrorPage.SetIconName("")
+	r.reveal.SetChild(loading)
+
+	go func() {
+		log.Printf("chose pattern\n%#v", apiPattern)
+
+		p, err := httpcache.DownloadPattern(context.TODO(), apiPattern)
+		if err != nil {
+			glib.IdleAdd(func() { loading.SetError(err) })
+			return
+		}
+
+		glib.IdleAdd(func() {
+			r.tryout = newPatternTryout(r.info.page, p)
+			r.tryout.SetSizeRequest(-1, 50)
+			r.reveal.SetChild(r.tryout)
+		})
+	}()
+}
+
+type patternInfo struct {
 	*gtk.Box // vertical
 	page     *DevicePage
 	pattern  *api.Pattern
@@ -114,8 +181,8 @@ var authorAttrs = components.PangoAttrs(
 	pango.NewAttrForegroundAlpha(components.PercentAlpha(0.85)),
 )
 
-func newPatternPreview(page *DevicePage, apiPattern *api.Pattern) *patternPreview {
-	p := &patternPreview{
+func newPatternInfo(page *DevicePage, apiPattern *api.Pattern) *patternInfo {
+	p := &patternInfo{
 		page:    page,
 		pattern: apiPattern,
 	}
@@ -197,72 +264,7 @@ func stringifyFeatures(feats []pattern.Feature) string {
 	return b.String()
 }
 
-func (p *patternPreview) tryout() {
-	tryout := newPatternTryout(p.page, p.pattern)
-	tryout.Show()
-}
-
 type patternTryout struct {
-	*gtk.Dialog
-	page *DevicePage
-	main *gtk.Box
-	body *components.FailableContent
-	info *patternPreview
-}
-
-func newPatternTryout(page *DevicePage, p *api.Pattern) *patternTryout {
-	t := &patternTryout{page: page}
-
-	t.body = components.NewFailableContent()
-	t.body.SetVExpand(true)
-
-	t.info = newPatternPreview(page, p)
-	t.info.SetVExpand(false)
-
-	t.main = gtk.NewBox(gtk.OrientationVertical, 0)
-	t.main.AddCSSClass("pattern-tryout")
-	t.main.Append(t.body)
-	t.main.Append(t.info)
-
-	t.Dialog = gtk.NewDialogWithFlags(
-		p.DecodedName()+" ⁠— Intiface",
-		app.Require().ActiveWindow(),
-		gtk.DialogModal|gtk.DialogUseHeaderBar|gtk.DialogDestroyWithParent,
-	)
-	t.Dialog.AddCSSClass("pattern-tryout-dialog")
-	t.Dialog.SetApplication(app.Require())
-	t.Dialog.SetDefaultSize(400, 100)
-	t.Dialog.SetChild(t.main)
-
-	// TODO: maybe this doesn't have to be a dialog. We can just make the row
-	// collapse or expand by itself, then have the preview lazily loaded right
-	// there. Having dialogs is kind of unmanageable.
-
-	saveAs := t.Dialog.AddButton("Save As", int(gtk.ResponseApply)).(*gtk.Button)
-	saveAs.AddCSSClass("suggested-action")
-	saveAs.ConnectClicked(t.saveAs)
-
-	go func() {
-		log.Printf("URL: %#v", p)
-
-		p, err := httpcache.DownloadPattern(t.body, p)
-		if err != nil {
-			glib.IdleAdd(func() { t.body.SetError(err) })
-			return
-		}
-
-		glib.IdleAdd(func() {
-			body := newPatternTryoutBody(page, p)
-			t.body.SetChild(body)
-		})
-	}()
-
-	return t
-}
-
-func (t *patternTryout) saveAs() {}
-
-type patternTryoutBody struct {
 	*gtk.Box
 	page    *DevicePage
 	pattern *pattern.Pattern
@@ -278,13 +280,13 @@ type patternTryoutBody struct {
 	updating bool
 }
 
-func newPatternTryoutBody(page *DevicePage, p *pattern.Pattern) *patternTryoutBody {
-	b := &patternTryoutBody{
+func newPatternTryout(page *DevicePage, p *pattern.Pattern) *patternTryout {
+	t := &patternTryout{
 		page:    page,
 		pattern: p,
 		player:  newPatternPlayer(page, p),
 	}
-	b.player.F = b.tick
+	t.player.F = t.tick
 
 	// b.plot = sparklines.NewPlot()
 	// b.plot.AddCSSClass("pattern-tryout-sparkline")
@@ -297,61 +299,78 @@ func newPatternTryoutBody(page *DevicePage, p *pattern.Pattern) *patternTryoutBo
 	// 	b.lines = append(b.lines, b.plot.AddLine())
 	// }
 
-	b.toggle = gtk.NewButtonFromIconName("media-playback-start-symbolic")
-	b.toggle.ConnectClicked(func() {
-		if b.player.IsStarted() {
-			b.player.Stop()
-			b.page.stopAll()
-			b.RemoveCSSClass("pattern-playing")
-			b.toggle.SetIconName("media-playback-start-symbolic")
-		} else {
-			b.player.Start()
-			b.AddCSSClass("pattern-playing")
-			b.toggle.SetIconName("media-playback-pause-symbolic")
-		}
-	})
+	t.toggle = gtk.NewButtonFromIconName("media-playback-start-symbolic")
+	t.toggle.ConnectClicked(t.togglePlay)
 
-	b.seeker = gtk.NewScaleWithRange(
+	t.seeker = gtk.NewScaleWithRange(
 		gtk.OrientationHorizontal,
 		0, patternDuration(p).Seconds(), 1,
 	)
-	b.seeker.SetHExpand(true)
-	b.seeker.SetDrawValue(true)
-	b.seeker.SetValuePos(gtk.PosRight)
-	b.seeker.ConnectValueChanged(b.seekToBar)
+	t.seeker.SetHExpand(true)
+	t.seeker.SetDrawValue(true)
+	t.seeker.SetValuePos(gtk.PosRight)
+	t.seeker.ConnectValueChanged(t.seekToBar)
 
 	totalDuration := fmtDuration(patternDuration(p))
-	b.seeker.SetFormatValueFunc(func(_ *gtk.Scale, secs float64) string {
+	t.seeker.SetFormatValueFunc(func(_ *gtk.Scale, secs float64) string {
 		return fmtDuration(secsToDuration(secs)) + "/" + totalDuration
 	})
 
-	b.controls = gtk.NewBox(gtk.OrientationHorizontal, 4)
-	b.controls.SetHExpand(true)
-	b.controls.SetVAlign(gtk.AlignCenter)
-	b.controls.Append(b.toggle)
-	b.controls.Append(b.seeker)
+	t.controls = gtk.NewBox(gtk.OrientationHorizontal, 4)
+	t.controls.SetHExpand(true)
+	t.controls.SetVAlign(gtk.AlignCenter)
+	t.controls.Append(t.toggle)
+	t.controls.Append(t.seeker)
 
-	b.Box = gtk.NewBox(gtk.OrientationHorizontal, 0)
-	b.Box.AddCSSClass("pattern-tryout-body")
+	t.Box = gtk.NewBox(gtk.OrientationHorizontal, 0)
+	t.Box.AddCSSClass("pattern-tryout-body")
 	// b.Box.Append(b.plot)
-	b.Box.Append(b.controls)
+	t.Box.Append(t.controls)
 
-	return b
+	return t
 }
 
 func secsToDuration(secs float64) time.Duration {
-	s, ns := math.Modf(secs)
-	return time.Duration(s)*time.Second + time.Duration(ns*float64(time.Second))
+	return time.Duration(secs * float64(time.Second))
 }
 
-func (t *patternTryoutBody) seekToBar() {
+func (t *patternTryout) togglePlay() {
+	if t.player.IsStarted() {
+		t.pause()
+	} else {
+		t.play()
+	}
+}
+
+func (t *patternTryout) pause() {
+	t.player.Stop()
+	t.page.stopAll()
+	t.RemoveCSSClass("pattern-playing")
+	t.toggle.SetIconName("media-playback-start-symbolic")
+}
+
+func (t *patternTryout) play() {
+	t.player.Start()
+	t.AddCSSClass("pattern-playing")
+	t.toggle.SetIconName("media-playback-pause-symbolic")
+}
+
+func (t *patternTryout) seekToBar() {
 	if t.updating {
 		return
 	}
-	// TODO
+
+	t.player.Frame = int(math.Floor(
+		// Scale the seeker value (in seconds) down, then scale it up according
+		// to the number of points. That gives us the new frame index.
+		t.seeker.Value() / patternDuration(t.pattern).Seconds() * float64(len(t.pattern.Points)),
+	))
+
+	// Don't call the tick callback. Let the background routine tick by itself,
+	// so the point-per-minute stays consistent.
 }
 
-func (t *patternTryoutBody) tick() {
+func (t *patternTryout) tick() {
 	t.player.tick()
 	t.updating = true
 	t.seeker.SetValue(t.player.CurrentDuration().Seconds())

@@ -93,11 +93,12 @@ func (p *DevicePage) loadBody() {
 		for motor, steps := range p.VibrationSteps() {
 			motor := motor
 			steps := float64(steps)
+			color := sparklines.HashColor("v", 2<<((motor+1)*8)) // make int variance larger
 
 			line := p.sparklines.AddLine()
 			line.Smooth = true
 			line.SetWidth(2)
-			line.SetColorHash("v", 2<<((motor+1)*8)) // make int variance larger
+			line.SetColor(color)
 
 			scale := gtk.NewScaleWithRange(gtk.OrientationVertical, 0, 100, 100/steps)
 			scale.SetDigits(2)
@@ -120,9 +121,15 @@ func (p *DevicePage) loadBody() {
 			// 	scale.AddMark(i/steps*100, gtk.PosRight, "")
 			// }
 
+			name := gtk.NewLabel("")
+			name.SetMarkup(fmt.Sprintf(
+				`<span color="%s">Motor %d</span>`,
+				sparklines.HexColor(color), motor,
+			))
+
 			box := gtk.NewBox(gtk.OrientationVertical, 2)
 			box.Append(scale)
-			box.Append(gtk.NewLabel(fmt.Sprintf("Motor %d", motor)))
+			box.Append(name)
 
 			child.Append(box)
 		}
@@ -234,12 +241,14 @@ func (p *DevicePage) updateIndicators() {
 }
 
 func (p *DevicePage) keepAlive() {
-	for _, rangeValue := range p.ranges {
-		rangeValue.SetValue(rangeValue.Value())
+	if !p.canBattery && !p.canRSSI {
+		for _, rangeValue := range p.ranges {
+			rangeValue.SetValue(rangeValue.Value())
+		}
 	}
 }
 
-const batteryUpdateFreq = 25 // seconds
+const batteryUpdateFreq = 10 // seconds
 
 func (p *DevicePage) mapUpdate(widget gtk.Widgetter) {
 	var t glib.SourceHandle

@@ -9,6 +9,8 @@ github.com/boombuler/barcode v1.0.1/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/diamondburned/adaptive v0.0.2-0.20211127231649-acf4ea5cacc5 h1:K0ZGSV5BCKTenM+Y/Up7BOOOj6AuwlCpPm7qnJL+w0g=
 github.com/diamondburned/adaptive v0.0.2-0.20211127231649-acf4ea5cacc5/go.mod h1:03zN7sBfi9WiZYnXsFtE6jkcQmyvX9Xay0QwUOZKnV8=
+github.com/diamondburned/adaptive v0.0.2-0.20211129005252-96a69d7a4f90 h1:+RkWeAdjCwfVA/PkTHlwbZEwJmP9gyG1kz09I2v6ss0=
+github.com/diamondburned/adaptive v0.0.2-0.20211129005252-96a69d7a4f90/go.mod h1:03zN7sBfi9WiZYnXsFtE6jkcQmyvX9Xay0QwUOZKnV8=
 github.com/diamondburned/go-buttplug v0.0.3 h1:tBRkOMm2GXKWVUOvwnszAGUM4tCF9CUsJyE/PKzlQFY=
 github.com/diamondburned/go-buttplug v0.0.3/go.mod h1:2WnC+qL7dg3vB6Hiv9HuITG/eYFsCQ1CETh1qmLUq1s=
 github.com/diamondburned/go-lovense v0.0.0-20211124112327-919ccd70ecea h1:tBNoWdyzJkMAJFmC20njwd7vApCyc57D+/CRZv9eToY=

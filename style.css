@@ -96,35 +96,46 @@
 	margin-left: 5px;
 }
 
+.pattern-browse-row {
+	background-color: @theme_bg_color;
+	border: 1px solid @borders;
+	border-radius: 8px;
+	margin-bottom: 8px;
+	padding: 0px;
+}
+
+.pattern-browse-item {
+	background-color: @theme_base_color;
+	border-radius: 0 0 8px 8px;
+	padding: 8px;
+}
+
+.pattern-browse-row:selected {
+	border-color: mix(@theme_selected_bg_color, @theme_bg_color, 0.5)
+}
+
+.pattern-browse-row:selected .pattern-browse-item {
+	background-color: mix(@theme_selected_bg_color, @theme_bg_color, 0.8);
+}
+
+.pattern-browse-item,
+.pattern-tryout-body {
+	padding: 8px;
+}
+
 .pattern-browser-body {
 	margin: 8px;
 }
 
-.pattern-browse-row {
-	background-color: @theme_base_color;
-	border: 1px solid @borders;
-	margin-bottom: 8px;
-	border-radius: 8px;
-	padding: 8px;
-}
-
 .pattern-tryout-body scale {
 	padding: 0;
-	margin-right: 2em;
-}
-
-.pattern-tryout-body scale > value {
-	margin-left: 10px;
+	margin-left: 8px;
 }
 
 .pattern-tryout-body button {
 	padding: 12px;
 	min-width:  0;
 	min-height: 0;
-}
-
-.pattern-tryout {
-	padding: 12px;
 }
 
 .vibrator-sparkline {

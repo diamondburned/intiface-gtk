@@ -238,7 +238,7 @@ func (p *Plot) cleanPoints() {
 
 func cleanPoints(line *Line, minX, maxX float64) {
 	// double threshold
-	minX -= (maxX - minX)
+	minX -= line.plot.trange.Seconds()
 
 	// seek until we're no longer at a point smaller than our X, but we should
 	// keep the last point.
