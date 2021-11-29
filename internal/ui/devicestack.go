@@ -32,6 +32,9 @@ func NewDeviceStack(Manager *Manager) *DeviceStack {
 		s.VisibleDevice()
 	})
 
+	greet := gtk.NewLabel("Select a device on the left panel.")
+	s.AddNamed(greet, "_greet_")
+
 	ch := Manager.Broadcaster.Listen()
 	s.updateDevices()
 
@@ -73,7 +76,12 @@ func (s *DeviceStack) OnDevice(f func()) {
 
 // TriggerOnDevice triggers the OnDevice callback.
 func (s *DeviceStack) TriggerOnDevice() {
-	s.onDevice()
+	if s.IsEmpty() {
+		s.Stack.SetVisibleChildName("_greet_")
+	}
+	if s.onDevice != nil {
+		s.onDevice()
+	}
 }
 
 func (s *DeviceStack) updateDevices() {
@@ -101,10 +109,7 @@ func (s *DeviceStack) addController(ctrl *device.Controller) {
 
 	s.devices[name] = page
 	s.AddTitled(page, name, string(ctrl.Device.Name))
-
-	if s.onDevice != nil {
-		s.onDevice()
-	}
+	s.TriggerOnDevice()
 }
 
 func (s *DeviceStack) removeDevice(ix buttplug.DeviceIndex) {
@@ -118,8 +123,5 @@ func (s *DeviceStack) removeDevice(ix buttplug.DeviceIndex) {
 
 	s.Stack.Remove(device)
 	delete(s.devices, name)
-
-	if s.onDevice != nil {
-		s.onDevice()
-	}
+	s.TriggerOnDevice()
 }

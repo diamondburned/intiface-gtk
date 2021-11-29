@@ -12,6 +12,7 @@ import (
 
 	_ "embed"
 
+	"github.com/diamondburned/adaptive"
 	"github.com/diamondburned/go-buttplug"
 	"github.com/diamondburned/go-buttplug/device"
 	"github.com/diamondburned/go-buttplug/intiface"
@@ -48,6 +49,8 @@ func main() {
 var styleCSS string
 
 func activate(ctx context.Context, app *gtk.Application) *Window {
+	adaptive.Init()
+
 	w := NewWindow(ctx, app)
 	w.StartLoading()
 	defer w.Show()
@@ -70,7 +73,7 @@ type Window struct {
 }
 
 type mainContent struct {
-	*gtk.Overlay
+	*adaptive.Fold
 	sidebar *gtk.StackSidebar
 	stack   *ui.DeviceStack
 }
@@ -102,6 +105,7 @@ func NewWindow(ctx context.Context, app *gtk.Application) *Window {
 
 func (w *Window) Loaded(manager *ui.Manager) {
 	stack := ui.NewDeviceStack(manager)
+	stack.SetHExpand(true)
 
 	sidebar := gtk.NewStackSidebar()
 	sidebar.SetStack(stack.Stack)
@@ -112,7 +116,6 @@ func (w *Window) Loaded(manager *ui.Manager) {
 
 	sidestack := gtk.NewStack()
 	sidestack.SetTransitionType(gtk.StackTransitionTypeCrossfade)
-	sidestack.SetSizeRequest(250, -1)
 	sidestack.AddChild(sidebar)
 	sidestack.AddChild(noDevices)
 
@@ -125,37 +128,23 @@ func (w *Window) Loaded(manager *ui.Manager) {
 	})
 	stack.TriggerOnDevice()
 
-	revealer := gtk.NewRevealer()
-	revealer.SetHAlign(gtk.AlignStart)
-	revealer.SetTransitionType(gtk.RevealerTransitionTypeSlideRight)
-	revealer.AddCSSClass("side-revealer")
-	revealer.SetChild(sidestack)
+	fold := adaptive.NewFold(gtk.PosLeft)
+	fold.SetSideChild(sidestack)
+	fold.SetChild(stack)
+	fold.SetFoldWidth(200)
+	fold.SetFoldThreshold(450)
 
-	overlay := gtk.NewOverlay()
-	overlay.SetChild(stack)
-	overlay.AddOverlay(revealer)
-	overlay.SetMeasureOverlay(revealer, true)
-
-	reveal := gtk.NewToggleButton()
+	reveal := adaptive.NewFoldRevealButton()
 	reveal.SetIconName("phone-symbolic")
-	reveal.ConnectClicked(func() {
-		active := reveal.Active()
-		revealer.SetRevealChild(active)
-
-		if active {
-			overlay.AddCSSClass("sidebar-open")
-		} else {
-			overlay.RemoveCSSClass("sidebar-open")
-		}
-	})
+	reveal.ConnectFold(fold)
 
 	header := gtk.NewHeaderBar()
 	header.PackStart(reveal)
 
-	w.SetChild(overlay)
+	w.SetChild(fold)
 	w.SetTitlebar(header)
 	w.SetSizeRequest(250, -1)
-	w.SetDefaultSize(350, 550)
+	w.SetDefaultSize(450, 500)
 
 	stack.Connect("notify::visible-child", func() {
 		device := stack.VisibleDevice()
@@ -164,11 +153,11 @@ func (w *Window) Loaded(manager *ui.Manager) {
 		}
 	})
 
-	reveal.SetActive(true)
-	revealer.SetRevealChild(true)
+	reveal.Button.SetActive(true)
+	fold.SetRevealSide(true)
 
 	w.main = &mainContent{
-		Overlay: overlay,
+		Fold:    fold,
 		sidebar: sidebar,
 		stack:   stack,
 	}

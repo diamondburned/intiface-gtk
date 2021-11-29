@@ -1,6 +1,7 @@
 package sparklines
 
 import (
+	"fmt"
 	"hash/fnv"
 	"image/color"
 	"math"
@@ -14,9 +15,9 @@ var (
 )
 
 // HashColor hashes the given string into a color.RGBA.
-func HashColor(str string) color.RGBA64 {
+func HashColor(v ...interface{}) color.RGBA64 {
 	hash := fnv.New32()
-	hash.Write([]byte(str))
+	hash.Write([]byte(fmt.Sprint(v...)))
 
 	h := float64(hash.Sum32()) / math.MaxUint32
 

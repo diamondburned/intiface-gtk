@@ -1,0 +1,237 @@
+package components
+
+import (
+	"log"
+
+	"github.com/diamondburned/gotk4/pkg/gdk/v4"
+	"github.com/diamondburned/gotk4/pkg/glib/v2"
+	"github.com/diamondburned/gotk4/pkg/gtk/v4"
+)
+
+// Sidebar is a component that acts similar to libadwaita's AdwFlap.
+type Sidebar struct {
+	gtk.Widgetter
+	overlay *gtk.Overlay
+	main    *gtk.Box
+
+	siderev    *gtk.Revealer
+	sidebox    *gtk.Box
+	contentbox *gtk.Box
+
+	side    gtk.Widgetter
+	content gtk.Widgetter
+
+	onFold func(bool)
+
+	fpos   gtk.PositionType
+	fwidth int
+
+	fold   bool
+	reveal bool
+}
+
+const (
+	defaultSidebarWidth  = 500
+	sidebarMarginTrigger = 50
+)
+
+// NewSidebar creates a new sidebar.
+func NewSidebar(position gtk.PositionType) *Sidebar {
+	s := &Sidebar{
+		fpos:   position,
+		fwidth: defaultSidebarWidth,
+		fold:   false,
+	}
+
+	s.sidebox = gtk.NewBox(gtk.OrientationHorizontal, 0)
+	s.sidebox.SetSizeRequest(defaultSidebarWidth/2, -1)
+	s.sidebox.AddCSSClass("sidebar-side")
+
+	s.siderev = gtk.NewRevealer()
+	s.siderev.AddCSSClass("sidebar-revealer")
+	s.siderev.SetChild(s.sidebox)
+	s.siderev.SetHExpand(false)
+
+	s.contentbox = gtk.NewBox(gtk.OrientationHorizontal, 0)
+	s.contentbox.AddCSSClass("sidebar-child")
+	s.contentbox.SetHExpand(true)
+	s.main = gtk.NewBox(gtk.OrientationHorizontal, 0)
+
+	switch position {
+	case gtk.PosLeft:
+		s.siderev.SetHAlign(gtk.AlignStart)
+		s.siderev.SetTransitionType(gtk.RevealerTransitionTypeSlideRight)
+		s.main.Append(s.siderev)
+		s.main.Append(s.contentbox)
+	case gtk.PosRight:
+		s.siderev.SetHAlign(gtk.AlignEnd)
+		s.siderev.SetTransitionType(gtk.RevealerTransitionTypeSlideLeft)
+		s.main.Append(s.contentbox)
+		s.main.Append(s.siderev)
+	default:
+		log.Panicln("invalid position given:", position)
+	}
+
+	s.overlay = gtk.NewOverlay()
+	s.overlay.SetChild(s.main)
+	s.overlay.AddCSSClass("sidebar-overlay")
+
+	s.Widgetter = s.overlay
+	s.bind(s.Widgetter)
+
+	return s
+}
+
+// SetFoldThreshold sets the width threshold that the sidebar will determine
+// whether or not to fold.
+func (s *Sidebar) SetFoldThreshold(fwidth int) {
+	s.fwidth = fwidth
+	s.updateLayout(-1)
+}
+
+// FoldThreshold returns the fold width.
+func (s *Sidebar) FoldThreshold() int {
+	return s.fwidth
+}
+
+// SidebarWidth returns the width of the sidebar. It is calculated from the fold
+// threshold.
+func (s *Sidebar) SidebarWidth() int {
+	return s.fwidth / 2
+}
+
+// SetSideChild sets the sidebar's side content.
+func (s *Sidebar) SetSideChild(child gtk.Widgetter) {
+	if s.side != nil {
+		s.sidebox.Remove(s.side)
+		s.side = nil
+	}
+
+	s.side = child
+	s.sidebox.Append(child)
+}
+
+// SetChild sets the sidebar's main content.
+func (s *Sidebar) SetChild(child gtk.Widgetter) {
+	if s.content != nil {
+		s.contentbox.Remove(s.content)
+		s.content = nil
+	}
+
+	s.content = child
+	s.contentbox.Append(child)
+}
+
+// SetFolded sets whether or not the sidebar is folded.
+func (s *Sidebar) SetFolded(folded bool) {
+	if folded {
+		s.doFold()
+	} else {
+		s.doUnfold()
+	}
+}
+
+// SetRevealSide sets whether or not the sidebar is revealed. It does not
+// change if the sidebar isn't currently folded.
+func (s *Sidebar) SetRevealSide(reveal bool) {
+	s.reveal = reveal
+	s.updateRevealSide()
+}
+
+// SideIsRevealed returns true if the sidebar is revealed. If the sidebar is not
+// folded, then true is returned regardless of what's given into SetRevealSide.
+func (s *Sidebar) SideIsRevealed() bool {
+	return s.siderev.RevealChild()
+}
+
+// NotifyFolded subscribes f to be called if the sidebar is folded or unfolded.
+func (s *Sidebar) NotifyFolded(f func(folded bool)) {
+	if s.onFold == nil {
+		s.onFold = f
+		return
+	}
+
+	old := s.onFold
+	s.onFold = func(folded bool) {
+		old(folded)
+		f(folded)
+	}
+}
+
+func (s *Sidebar) notifyFolded() {
+	if s.fold {
+		s.overlay.AddCSSClass("sidebar-folded")
+	} else {
+		s.overlay.RemoveCSSClass("sidebar-folded")
+	}
+	if s.onFold != nil {
+		s.onFold(s.fold)
+	}
+}
+
+func (s *Sidebar) bind(widget gtk.Widgetter) {
+	var handle glib.SignalHandle
+	var surface *gdk.Surface
+
+	w := gtk.BaseWidget(widget)
+
+	w.ConnectRealize(func() {
+		surface = gdk.BaseSurface(w.GetNative().Surface())
+		handle = surface.ConnectLayout(func(int, int) { s.updateLayout() })
+	})
+	w.ConnectUnrealize(func() {
+		surface.HandlerDisconnect(handle)
+		surface = nil
+	})
+}
+
+func (s *Sidebar) updateLayout() {
+	if (s.fwidth + sidebarMarginTrigger) <= s.overlay.AllocatedWidth() {
+		s.doUnfold()
+	} else {
+		s.doFold()
+	}
+}
+
+func (s *Sidebar) updateRevealSide() {
+	reveal := s.reveal || !s.fold
+	s.siderev.SetRevealChild(reveal)
+
+	if reveal {
+		s.overlay.AddCSSClass("sidebar-open")
+	} else {
+		s.overlay.RemoveCSSClass("sidebar-open")
+	}
+}
+
+func (s *Sidebar) doFold() {
+	if s.fold {
+		return
+	}
+	s.fold = true
+
+	s.main.Remove(s.siderev)
+	s.overlay.AddOverlay(s.siderev)
+	s.overlay.SetMeasureOverlay(s.siderev, true)
+
+	s.updateRevealSide()
+	s.notifyFolded()
+}
+
+func (s *Sidebar) doUnfold() {
+	if !s.fold {
+		return
+	}
+	s.fold = false
+
+	s.overlay.RemoveOverlay(s.siderev)
+	switch s.fpos {
+	case gtk.PosLeft:
+		s.main.Prepend(s.siderev)
+	case gtk.PosRight:
+		s.main.Append(s.siderev)
+	}
+
+	s.updateRevealSide()
+	s.notifyFolded()
+}

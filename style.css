@@ -1,13 +1,5 @@
-.side-revealer {
-	background-color: @theme_base_color;
-}
-
 .devices-stack {
 	transition: linear 100ms filter;
-}
-
-.sidebar-open .devices-stack {
-	filter: blur(10px) brightness(0.65);
 }
 
 .cli-prompt-form > label {
@@ -133,4 +125,8 @@
 
 .pattern-tryout {
 	padding: 12px;
+}
+
+.vibrator-sparkline {
+	background-color: @theme_base_color;
 }

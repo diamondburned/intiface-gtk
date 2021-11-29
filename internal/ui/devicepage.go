@@ -73,7 +73,7 @@ func (p *DevicePage) loadGraph() {
 	p.sparklines.AddCSSClass("vibrator-sparkline")
 	p.sparklines.SetDuration(3 * time.Second)
 	p.sparklines.SetRange(0, 100)
-	p.sparklines.SetPadding(4, 6)
+	p.sparklines.SetPadding(4, 2)
 	p.sparklines.SetMinHeight(80)
 	// p.sparklines.SetNeedle(0, color.RGBA{255, 0, 0, 255}, 2)
 
@@ -95,6 +95,7 @@ func (p *DevicePage) loadBody() {
 			steps := float64(steps)
 
 			line := p.sparklines.AddLine()
+			line.Smooth = true
 			line.SetWidth(2)
 			line.SetColorHash("v", 2<<((motor+1)*8)) // make int variance larger
 
@@ -115,9 +116,9 @@ func (p *DevicePage) loadBody() {
 
 			p.ranges = append(p.ranges, scale)
 
-			for i := 0.0; i <= steps; i++ {
-				scale.AddMark(i/steps*100, gtk.PosRight, "")
-			}
+			// for i := 0.0; i <= steps; i++ {
+			// 	scale.AddMark(i/steps*100, gtk.PosRight, "")
+			// }
 
 			box := gtk.NewBox(gtk.OrientationVertical, 2)
 			box.Append(scale)

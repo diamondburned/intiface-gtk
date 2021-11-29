@@ -7,12 +7,15 @@ github.com/ajstarks/svgo v0.0.0-20210923152817-c3b6e2f0c527/go.mod h1:K08gAheRH3
 github.com/boombuler/barcode v1.0.0/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
 github.com/boombuler/barcode v1.0.1/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/diamondburned/adaptive v0.0.2-0.20211127231649-acf4ea5cacc5 h1:K0ZGSV5BCKTenM+Y/Up7BOOOj6AuwlCpPm7qnJL+w0g=
+github.com/diamondburned/adaptive v0.0.2-0.20211127231649-acf4ea5cacc5/go.mod h1:03zN7sBfi9WiZYnXsFtE6jkcQmyvX9Xay0QwUOZKnV8=
 github.com/diamondburned/go-buttplug v0.0.3 h1:tBRkOMm2GXKWVUOvwnszAGUM4tCF9CUsJyE/PKzlQFY=
 github.com/diamondburned/go-buttplug v0.0.3/go.mod h1:2WnC+qL7dg3vB6Hiv9HuITG/eYFsCQ1CETh1qmLUq1s=
 github.com/diamondburned/go-lovense v0.0.0-20211124112327-919ccd70ecea h1:tBNoWdyzJkMAJFmC20njwd7vApCyc57D+/CRZv9eToY=
 github.com/diamondburned/go-lovense v0.0.0-20211124112327-919ccd70ecea/go.mod h1:6xGKGLhLQR1WlHS9mogdzjH7nkp//dmzLtl3VbmmaLc=
-github.com/diamondburned/gotk4/pkg v0.0.0-20211121034925-b429b945ab5d h1:aqjfoCaOxa4maQxNz8N+Qsb0mE55ziS08Z2EIkK5r6s=
 github.com/diamondburned/gotk4/pkg v0.0.0-20211121034925-b429b945ab5d/go.mod h1:dJ2gfR0gvBsGg4IteP8aMBq/U5Q9boDw0DP7kAjXTwM=
+github.com/diamondburned/gotk4/pkg v0.0.0-20211121095826-148e5d6f3165 h1:WwSWT8jjG7gsJ/CsLyTs2e9P5UQ5VTsNeX48wIEZQiU=
+github.com/diamondburned/gotk4/pkg v0.0.0-20211121095826-148e5d6f3165/go.mod h1:dJ2gfR0gvBsGg4IteP8aMBq/U5Q9boDw0DP7kAjXTwM=
 github.com/diamondburned/vgcairo v0.0.0-20211121084140-bec98bb26e72 h1:Grp0nYaMJ7mgBJC+ODHTx5RqiQGmLhJ6Kxw7g64xVnA=
 github.com/diamondburned/vgcairo v0.0.0-20211121084140-bec98bb26e72/go.mod h1:fbTLHOjbwAEu2R+NuFiRSEmdPdcG8E+Z9MogC3kyOL8=
 github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzPa1k=

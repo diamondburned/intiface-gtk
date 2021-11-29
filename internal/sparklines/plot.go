@@ -36,6 +36,7 @@ func NewPlot() *Plot {
 	p := &Plot{
 		Plot: plot.New(),
 	}
+	p.SetPadding(0, 0)
 	p.HideAxes()
 	p.BackgroundColor = color.Transparent
 
@@ -60,44 +61,35 @@ func NewPlot() *Plot {
 		))
 	})
 
-	startLoop := func() {
+	currentFPS := 0.0
+
+	updateLoop := func(clock *gdk.FrameClock) {
+		if fps := clock.FPS(); fps == currentFPS {
+			return
+		} else {
+			currentFPS = fps
+		}
+
 		if p.clockHandle > 0 {
 			glib.SourceRemove(p.clockHandle)
 			p.clockHandle = 0
 		}
 
-		clock := gdk.BaseFrameClock(p.FrameClock())
-
-		fps := clock.Fps()
-		if fps < 1 {
-			return
-		}
 		ms := uint(1)
-		if fps < 1000 {
-			ms = 1000 / uint(fps)
+		if currentFPS < 1000 {
+			ms = 1000 / uint(currentFPS)
 		}
 
 		p.clockHandle = glib.TimeoutAdd(ms, func() bool {
-			p.InvalidateTime()
+			p.QueueDraw()
 			return true
 		})
 	}
 
-	var updater glib.SignalHandle
-	p.ConnectRealize(func() {
-		clock := gdk.BaseFrameClock(p.FrameClock())
-		updater = clock.ConnectUpdate(startLoop)
-
-		startLoop()
-	})
-	p.ConnectUnrealize(func() {
-		clock := gdk.BaseFrameClock(p.FrameClock())
-		clock.HandlerDisconnect(updater)
-
-		if p.clockHandle > 0 {
-			glib.SourceRemove(p.clockHandle)
-			p.clockHandle = 0
-		}
+	p.AddTickCallback(func(_ gtk.Widgetter, clock gdk.FrameClocker) bool {
+		updateLoop(gdk.BaseFrameClock(clock))
+		p.InvalidateTime()
+		return true
 	})
 
 	return p
@@ -162,10 +154,6 @@ func (p *Plot) SetNeedle(d time.Duration, clr color.Color, width float64) {
 	p.needle.LineStyle.Width = vg.Length(width)
 
 	p.InvalidateTime()
-
-	// now := xTime(p.X.Max)
-	// p.needle.XYs[0].X = timeX(now.Add(-d))
-	// p.needle.XYs[1].X = p.needle.XYs[0].X
 }
 
 // SetDuration sets the total horizontal points on the plot by deriving it from

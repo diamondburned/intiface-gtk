@@ -3,9 +3,10 @@ module github.com/diamondburned/intiface-gtk
 go 1.17
 
 require (
+	github.com/diamondburned/adaptive v0.0.2-0.20211127231649-acf4ea5cacc5
 	github.com/diamondburned/go-buttplug v0.0.3
 	github.com/diamondburned/go-lovense v0.0.0-20211124112327-919ccd70ecea
-	github.com/diamondburned/gotk4/pkg v0.0.0-20211121034925-b429b945ab5d
+	github.com/diamondburned/gotk4/pkg v0.0.0-20211121095826-148e5d6f3165
 	github.com/diamondburned/vgcairo v0.0.0-20211121084140-bec98bb26e72
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	github.com/pkg/errors v0.9.1

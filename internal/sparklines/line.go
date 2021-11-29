@@ -22,6 +22,8 @@ type Line struct {
 	// LineStyle is the style of the line connecting the points.
 	// Use zero width to disable lines.
 	draw.LineStyle
+	// Smooth, if true, will draw the lines smoothly.
+	Smooth bool
 }
 
 // NewLine creates a new line.
@@ -31,13 +33,26 @@ func NewLine(p *Plot) *Line {
 			Color: color.Black,
 			Width: 1,
 		},
-		plot: p,
+		XYs:    make(plotter.XYs, 0, 128), // ~2KB
+		plot:   p,
+		Smooth: true,
 	}
 }
 
 // AddPoint adds the given point into the line.
 func (l *Line) AddPoint(pt float64) {
 	l.plot.invalidateTime()
+
+	if len(l.XYs) > 0 {
+		last := l.XYs[len(l.XYs)-1]
+		// If the last point is far away, then we can craft a fake point in by
+		// copying the point subtracted by a few milliseconds.
+		const threshold = 0.050 // ms
+		if last.X < (l.plot.X.Max - threshold) {
+			last.X = l.plot.X.Max - threshold
+			l.XYs = append(l.XYs, last)
+		}
+	}
 
 	l.XYs = append(l.XYs, plotter.XY{
 		X: l.plot.X.Max,
@@ -133,22 +148,36 @@ func (l *Line) Plot(canvas draw.Canvas, plot *plot.Plot) {
 	var pa vg.Path
 	var i int
 
-	pa.Move(vg.Point{
-		X: vg.Length(pts[i].X),
-		Y: vg.Length(pts[i].Y),
-	})
+	if !l.Smooth {
+		pa.Move(vg.Point{
+			X: vg.Length(pts[i].X),
+			Y: vg.Length(pts[i].Y),
+		})
+		for i = 1; i < len(pts); i++ {
+			pa.Line(vg.Point{
+				X: vg.Length(pts[i].X),
+				Y: vg.Length(pts[i].Y),
+			})
+		}
+	} else {
+		pa.Move(vg.Point{
+			X: vg.Length(pts[i].X),
+			Y: vg.Length(pts[i].Y),
+		})
+		for i = 1; i < len(pts)-1; i++ {
+			xc := (pts[i].X + pts[i+1].X) / 2
+			yc := (pts[i].Y + pts[i+1].Y) / 2
 
-	for i = 1; i < len(pts)-1; i++ {
-		xc := (pts[i].X + pts[i+1].X) / 2
-		yc := (pts[i].Y + pts[i+1].Y) / 2
-
-		pa.QuadTo(
-			vg.Point{X: vg.Length(pts[i].X), Y: vg.Length(pts[i].Y)},
-			vg.Point{X: vg.Length(xc), Y: vg.Length(yc)},
-		)
+			pa.QuadTo(
+				vg.Point{X: vg.Length(pts[i].X), Y: vg.Length(pts[i].Y)},
+				vg.Point{X: vg.Length(xc), Y: vg.Length(yc)},
+			)
+		}
+		pa.Line(vg.Point{
+			X: vg.Length(pts[i+0].X),
+			Y: vg.Length(pts[i+0].Y),
+		})
 	}
-
-	pa.Line(vg.Point{X: vg.Length(pts[i+0].X), Y: vg.Length(pts[i+0].Y)})
 
 	canvas.SetLineStyle(l.LineStyle)
 	canvas.Stroke(pa)
