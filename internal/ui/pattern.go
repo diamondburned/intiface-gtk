@@ -198,7 +198,7 @@ func newPatternState(b *patternBox, p *pattern.Pattern, name string) *patternSta
 	togglePlay.ConnectClicked(func() {
 		if s.player.IsStarted() {
 			s.player.Stop()
-			s.page.stopAll()
+			s.page.setZeroValues()
 			s.RemoveCSSClass("pattern-playing")
 			togglePlay.SetIconName("media-playback-start-symbolic")
 		} else {

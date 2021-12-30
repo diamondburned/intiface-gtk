@@ -138,6 +138,11 @@
 	min-height: 0;
 }
 
+.pattern-browse-actions {
+	margin: 8px;
+	margin-top: 0;
+}
+
 .vibrator-sparkline {
 	background-color: @theme_base_color;
 }

@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/diamondburned/adaptive v0.0.2-0.20211129005252-96a69d7a4f90
-	github.com/diamondburned/go-buttplug v0.0.3
+	github.com/diamondburned/go-buttplug v0.0.4-0.20211201104935-76d4b7106951
 	github.com/diamondburned/go-lovense v0.0.0-20211124112327-919ccd70ecea
 	github.com/diamondburned/gotk4/pkg v0.0.0-20211121095826-148e5d6f3165
 	github.com/diamondburned/vgcairo v0.0.0-20211121084140-bec98bb26e72

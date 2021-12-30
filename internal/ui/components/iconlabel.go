@@ -47,6 +47,12 @@ func NewIconLabel(icon, text string, iconPos gtk.PositionType) *IconLabel {
 	}
 }
 
+// SetIconLabel sets the wohle icon label's contents to something else.
+func (i *IconLabel) SetIconLabel(icon, text string) {
+	i.Icon.SetFromIconName(icon)
+	i.Label.SetText(text)
+}
+
 // IconLabelButton is an icon-label button.
 type IconLabelButton struct {
 	*gtk.Button

@@ -1,10 +1,12 @@
 package ui
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/diamondburned/adaptive"
 	"github.com/diamondburned/go-lovense/api"
 	"github.com/diamondburned/go-lovense/pattern"
+	"github.com/diamondburned/gotk4/pkg/gio/v2"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 	"github.com/diamondburned/gotk4/pkg/pango"
@@ -20,92 +23,213 @@ import (
 	"github.com/diamondburned/intiface-gtk/internal/ui/components"
 )
 
+type pageDialog struct {
+	*DevicePage
+	dialog *gtk.Dialog
+}
+
+func patternFindTypeString(t api.PatternFindType) string {
+	switch t {
+	case api.FindPickPatterns:
+		return "Lovense Picks"
+	case api.FindPopularPatterns:
+		return "Popular"
+	case api.FindRecentPatterns:
+		return "Recent"
+	case api.FindRecommendedPatterns:
+		return "Recommended"
+	default:
+		return string(t)
+	}
+}
+
+// TODO: patternFindTypes
+var patternFindTypes = []api.PatternFindType{
+	api.FindRecommendedPatterns,
+	api.FindPopularPatterns,
+	api.FindRecentPatterns,
+	api.FindPickPatterns,
+}
+
 type PatternBrowser struct {
 	*gtk.Dialog
-	main *adaptive.LoadablePage
-	body *patternBrowserBody
+	body      *patternBrowserBody
+	searchBar *gtk.SearchBar
 }
 
 func NewPatternBrowser(page *DevicePage) *PatternBrowser {
 	b := &PatternBrowser{}
-	b.main = adaptive.NewLoadablePage()
-	b.main.SetLoading()
-
 	b.Dialog = gtk.NewDialogWithFlags(
 		"Patterns ⁠— Intiface",
 		app.Require().ActiveWindow(),
 		gtk.DialogDestroyWithParent|gtk.DialogUseHeaderBar,
 	)
+
+	b.body = newPatternBrowserBody(&pageDialog{
+		DevicePage: page,
+		dialog:     b.Dialog,
+	})
+	b.body.SetVExpand(true)
+	b.body.SetHExpand(true)
+
+	searchEntry := gtk.NewSearchEntry()
+	searchEntry.SetHExpand(true)
+	searchEntry.SetObjectProperty("placeholder-text", "Enter keywords...")
+	searchEntry.ConnectSearchChanged(func() {
+		b.body.search.text = searchEntry.Text()
+		b.body.update()
+	})
+
+	b.searchBar = gtk.NewSearchBar()
+	b.searchBar.AddCSSClass("pattern-browser-search")
+	b.searchBar.SetChild(searchEntry)
+	b.searchBar.ConnectEntry(&searchEntry.Editable)
+	b.searchBar.SetKeyCaptureWidget(b.body)
+	b.searchBar.SetSearchMode(false)
+	b.searchBar.SetShowCloseButton(false)
+
+	searchButton := gtk.NewToggleButton()
+	searchButton.SetIconName("system-search-symbolic")
+	searchButton.ConnectClicked(func() {
+		b.searchBar.SetSearchMode(searchButton.Active())
+	})
+
+	b.searchBar.Connect("notify::search-mode-enabled", func() {
+		b.body.search.text = ""
+		b.body.update()
+		searchButton.SetActive(b.searchBar.SearchMode())
+	})
+
+	box := gtk.NewBox(gtk.OrientationVertical, 0)
+	box.Append(b.searchBar)
+	box.Append(b.body)
+	box.SetFocusChild(b.body)
+
 	b.Dialog.AddCSSClass("pattern-browser-dialog")
 	b.Dialog.SetDefaultSize(350, 500)
-	b.Dialog.SetChild(b.main)
+	b.Dialog.SetChild(box)
 
-	go func() {
-		client := api.NewPatternClient(api.NewClientContext(context.TODO()))
-
-		patterns, err := client.Find(1, 50, api.FindRecommendedPatterns)
-		if err != nil {
-			glib.IdleAdd(func() { b.main.SetError(err) })
-			return
-		}
-
-		glib.IdleAdd(func() {
-			b.body = newPatternBrowserBody(page, patterns)
-			b.main.SetChild(b.body)
-		})
-	}()
+	header := b.Dialog.HeaderBar()
+	header.PackEnd(searchButton)
 
 	return b
 }
 
 type patternBrowserBody struct {
-	*gtk.ScrolledWindow
+	*adaptive.LoadablePage
+	page *pageDialog
+
+	scroll   *gtk.ScrolledWindow
 	listBox  *gtk.ListBox
 	patterns []*patternRow
+
+	search patternSearch
 }
 
-func newPatternBrowserBody(page *DevicePage, patterns []api.Pattern) *patternBrowserBody {
-	body := &patternBrowserBody{}
-	body.listBox = gtk.NewListBox()
-	body.listBox.AddCSSClass("pattern-browser-body")
-	body.listBox.SetSelectionMode(gtk.SelectionBrowse)
-	body.listBox.SetActivateOnSingleClick(true)
+type patternSearch struct {
+	text string
+	find api.PatternFindType
+	page int
+}
 
+func newPatternBrowserBody(page *pageDialog) *patternBrowserBody {
+	b := &patternBrowserBody{page: page}
+	b.search = patternSearch{
+		page: 1,
+		find: api.FindRecommendedPatterns,
+	}
+
+	b.listBox = gtk.NewListBox()
+	b.listBox.AddCSSClass("pattern-browser-body")
+	b.listBox.SetSelectionMode(gtk.SelectionBrowse)
+	b.listBox.SetActivateOnSingleClick(true)
 	var lastRow *patternRow
-	body.listBox.Connect("row-activated", func(row *gtk.ListBoxRow) {
+	b.listBox.Connect("row-activated", func(row *gtk.ListBoxRow) {
 		if lastRow != nil {
 			lastRow.reveal.SetRevealChild(false)
 		}
-		lastRow = body.patterns[row.Index()]
+		lastRow = b.patterns[row.Index()]
 		lastRow.reveal.SetRevealChild(true)
 	})
 
-	body.ScrolledWindow = gtk.NewScrolledWindow()
-	body.SetHExpand(true)
-	body.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
-	body.SetChild(body.listBox)
+	b.scroll = gtk.NewScrolledWindow()
+	b.scroll.SetHExpand(true)
+	b.scroll.SetVExpand(true)
+	b.scroll.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
+	b.scroll.SetChild(b.listBox)
 
-	body.patterns = make([]*patternRow, len(patterns))
-	for i := range patterns {
-		p := newPatternRow(page, &patterns[i])
-		body.patterns[i] = p
-		body.listBox.Append(p)
+	b.LoadablePage = adaptive.NewLoadablePage()
+	b.update()
+
+	return b
+}
+
+func (b *patternBrowserBody) update() {
+	b.SetLoading()
+
+	for _, pattern := range b.patterns {
+		b.listBox.Remove(pattern)
 	}
+	b.patterns = nil
 
-	return body
+	search := b.search
+	go func() {
+		client := api.NewPatternClient(api.NewClientContext(context.TODO()))
+
+		var patterns []api.Pattern
+		var err error
+
+		switch {
+		case search.text != "":
+			patterns, err = client.SearchTitle(search.text)
+		case search.page >= 1:
+			patterns, err = client.Find(search.page, 100, search.find)
+		default:
+			log.Printf("unreachable: %#v", search)
+			return
+		}
+
+		if err != nil {
+			glib.IdleAdd(func() { b.SetError(err) })
+			return
+		}
+
+		glib.IdleAdd(func() {
+			b.SetChild(b.scroll)
+
+			b.patterns = make([]*patternRow, len(patterns))
+			for i := range patterns {
+				p := newPatternRow(b.page, &patterns[i])
+				b.patterns[i] = p
+				b.listBox.Append(p)
+			}
+		})
+	}()
 }
 
 type patternRow struct {
 	*gtk.ListBoxRow
+	page *pageDialog
+
 	main   *gtk.Box
 	info   *patternInfo
 	reveal *gtk.Revealer
-	tryout *patternTryout
+
+	loading *adaptive.LoadablePage
+	loadBox *gtk.Box
+	tryout  *patternTryout
+	actions *patternActions
+
 	loaded bool
 }
 
-func newPatternRow(page *DevicePage, apiPattern *api.Pattern) *patternRow {
-	r := &patternRow{}
+type patternActions struct {
+	*gtk.Box
+	save *components.IconLabelButton
+}
+
+func newPatternRow(page *pageDialog, apiPattern *api.Pattern) *patternRow {
+	r := &patternRow{page: page}
 	r.info = newPatternInfo(page, apiPattern)
 
 	r.reveal = gtk.NewRevealer()
@@ -138,31 +262,98 @@ func (r *patternRow) load(apiPattern *api.Pattern) {
 
 	r.loaded = true
 
-	loading := adaptive.NewLoadablePage()
-	loading.SetSizeRequest(-1, 50)
-	loading.ErrorPage.SetIconName("")
-	r.reveal.SetChild(loading)
+	r.loading = adaptive.NewLoadablePage()
+	r.loading.SetSizeRequest(-1, 50)
+	r.loading.ErrorPage.SetIconName("")
+	r.reveal.SetChild(r.loading)
 
 	go func() {
 		log.Printf("chose pattern\n%#v", apiPattern)
 
-		p, err := httpcache.DownloadPattern(context.TODO(), apiPattern)
+		b, err := httpcache.DownloadPatternBytes(context.TODO(), apiPattern)
 		if err != nil {
-			glib.IdleAdd(func() { loading.SetError(err) })
+			glib.IdleAdd(func() { r.loading.SetError(err) })
+			return
+		}
+
+		p, err := pattern.Parse(bytes.NewReader(b))
+		if err != nil {
+			glib.IdleAdd(func() { r.loading.SetError(err) })
 			return
 		}
 
 		glib.IdleAdd(func() {
 			r.tryout = newPatternTryout(r.info.page, p)
 			r.tryout.SetSizeRequest(-1, 50)
-			r.reveal.SetChild(r.tryout)
+
+			r.finish(patternLoadedData{
+				pattern:  p,
+				rawBytes: b,
+			})
+		})
+	}()
+}
+
+type patternLoadedData struct {
+	pattern  *pattern.Pattern
+	rawBytes []byte
+}
+
+func (r *patternRow) finish(data patternLoadedData) {
+	actions := &patternActions{}
+	actions.save = components.NewIconLabelButton("document-save-symbolic", "Save", gtk.PosLeft)
+	actions.save.SetHasFrame(true)
+	actions.save.ConnectClicked(func() {
+		fm := gtk.NewFileChooserNative(
+			"Save Pattern", &r.page.dialog.Window, gtk.FileChooserActionSave, "", "")
+		fm.SetModal(true)
+		fm.ConnectResponse(func(resp int) {
+			if resp == int(gtk.ResponseAccept) {
+				r.save(fm.File(), data)
+			}
+		})
+		fm.Show()
+	})
+
+	actions.Box = gtk.NewBox(gtk.OrientationHorizontal, 0)
+	actions.Box.AddCSSClass("pattern-browse-actions")
+	actions.Box.Append(actions.save)
+
+	r.actions = actions
+
+	r.loadBox = gtk.NewBox(gtk.OrientationVertical, 0)
+	r.loadBox.Append(r.tryout)
+	r.loadBox.Append(actions)
+
+	r.loading.SetChild(r.loadBox)
+}
+
+func (r *patternRow) save(f gio.Filer, data patternLoadedData) {
+	path := f.Path()
+	if path == "" {
+		log.Println("invalid filepath selected")
+	}
+
+	r.loading.SetLoading()
+	go func() {
+		defer glib.IdleAdd(func() { r.page.dialog.SetSensitive(true) })
+
+		if err := os.WriteFile(path, data.rawBytes, os.ModePerm); err != nil {
+			glib.IdleAdd(func() { r.loading.SetError(err) })
+			return
+		}
+
+		glib.IdleAdd(func() {
+			r.loading.SetChild(r.loadBox)
+			r.actions.save.SetSensitive(false)
+			r.actions.save.IconLabel.SetIconLabel("object-select-symbolic", "Saved")
 		})
 	}()
 }
 
 type patternInfo struct {
 	*gtk.Box // vertical
-	page     *DevicePage
+	page     *pageDialog
 	pattern  *api.Pattern
 
 	left   *gtk.Box
@@ -181,7 +372,7 @@ var authorAttrs = components.PangoAttrs(
 	pango.NewAttrForegroundAlpha(components.PercentAlpha(0.85)),
 )
 
-func newPatternInfo(page *DevicePage, apiPattern *api.Pattern) *patternInfo {
+func newPatternInfo(page *pageDialog, apiPattern *api.Pattern) *patternInfo {
 	p := &patternInfo{
 		page:    page,
 		pattern: apiPattern,
@@ -266,7 +457,7 @@ func stringifyFeatures(feats []pattern.Feature) string {
 
 type patternTryout struct {
 	*gtk.Box
-	page    *DevicePage
+	page    *pageDialog
 	pattern *pattern.Pattern
 
 	// plot   *sparklines.Plot
@@ -280,11 +471,11 @@ type patternTryout struct {
 	updating bool
 }
 
-func newPatternTryout(page *DevicePage, p *pattern.Pattern) *patternTryout {
+func newPatternTryout(page *pageDialog, p *pattern.Pattern) *patternTryout {
 	t := &patternTryout{
 		page:    page,
 		pattern: p,
-		player:  newPatternPlayer(page, p),
+		player:  newPatternPlayer(page.DevicePage, p),
 	}
 	t.player.F = t.tick
 
@@ -344,7 +535,7 @@ func (t *patternTryout) togglePlay() {
 
 func (t *patternTryout) pause() {
 	t.player.Stop()
-	t.page.stopAll()
+	t.page.setZeroValues()
 	t.RemoveCSSClass("pattern-playing")
 	t.toggle.SetIconName("media-playback-start-symbolic")
 }

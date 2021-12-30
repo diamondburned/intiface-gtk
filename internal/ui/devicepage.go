@@ -12,9 +12,9 @@ import (
 	"github.com/diamondburned/intiface-gtk/internal/sparklines"
 )
 
-type valueRange interface {
-	Value() float64
-	SetValue(float64)
+type valueRange struct {
+	SetValue func(float64)
+	Changed  func()
 }
 
 func setRanges(ranges []valueRange, v float64) {
@@ -40,6 +40,7 @@ type DevicePage struct {
 	canRSSI    bool
 	canBattery bool
 	loaded     bool
+	paused     bool
 }
 
 // NewDevicePage creates a new device page.
@@ -109,17 +110,24 @@ func (p *DevicePage) loadBody() {
 			scale.SetFormatValueFunc(func(scale *gtk.Scale, value float64) string {
 				return fmt.Sprintf("%.0f%%", value)
 			})
-			scale.ConnectValueChanged(func() {
+
+			changed := func() {
 				value := scale.Value()
 				line.AddPoint(value)
-				p.Controller.Vibrate(map[int]float64{motor: value / 100})
+
+				if p.paused {
+					value = 0
+				} else {
+					value /= 100
+				}
+				p.Controller.Vibrate(map[int]float64{motor: value})
+			}
+
+			scale.ConnectValueChanged(changed)
+			p.ranges = append(p.ranges, valueRange{
+				SetValue: scale.SetValue,
+				Changed:  changed,
 			})
-
-			p.ranges = append(p.ranges, scale)
-
-			// for i := 0.0; i <= steps; i++ {
-			// 	scale.AddMark(i/steps*100, gtk.PosRight, "")
-			// }
 
 			name := gtk.NewLabel("")
 			name.SetMarkup(fmt.Sprintf(
@@ -175,9 +183,12 @@ func (p *DevicePage) loadBelow() {
 	p.updateIndicators()
 	p.mapUpdate(indicators)
 
-	stopAll := gtk.NewButtonFromIconName("system-shutdown-symbolic")
-	stopAll.SetTooltipText("Stop All")
-	stopAll.ConnectClicked(p.stopAll)
+	pause := gtk.NewToggleButton()
+	pause.SetIconName("media-playback-pause-symbolic")
+	pause.SetTooltipText("Pause")
+	pause.ConnectClicked(func() {
+		p.setPaused(pause.Active())
+	})
 
 	more := gtk.NewBox(gtk.OrientationVertical, 0)
 	more.AddCSSClass("more")
@@ -204,7 +215,7 @@ func (p *DevicePage) loadBelow() {
 	p.actions = gtk.NewActionBar()
 	p.actions.SetCenterWidget(revealButton)
 	p.actions.PackStart(indicators)
-	p.actions.PackEnd(stopAll)
+	p.actions.PackEnd(pause)
 
 	p.Box.Append(p.actions)
 	p.Box.Append(reveal)
@@ -242,9 +253,19 @@ func (p *DevicePage) updateIndicators() {
 
 func (p *DevicePage) keepAlive() {
 	if !p.canBattery && !p.canRSSI {
-		for _, rangeValue := range p.ranges {
-			rangeValue.SetValue(rangeValue.Value())
-		}
+		p.setSameValues()
+	}
+}
+
+func (p *DevicePage) setSameValues() {
+	for _, rangeValue := range p.ranges {
+		rangeValue.Changed()
+	}
+}
+
+func (p *DevicePage) setZeroValues() {
+	for _, rangeValue := range p.ranges {
+		rangeValue.SetValue(0)
 	}
 }
 
@@ -271,6 +292,7 @@ func (p *DevicePage) mapUpdate(widget gtk.Widgetter) {
 	})
 }
 
-func (p *DevicePage) stopAll() {
-	setRanges(p.ranges, 0)
+func (p *DevicePage) setPaused(paused bool) {
+	p.paused = paused
+	p.setSameValues()
 }

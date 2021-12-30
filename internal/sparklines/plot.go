@@ -64,7 +64,7 @@ func NewPlot() *Plot {
 	currentFPS := 0.0
 
 	updateLoop := func(clock *gdk.FrameClock) {
-		if fps := clock.FPS(); fps == currentFPS {
+		if fps := clock.FPS(); fps == currentFPS || fps == 0 {
 			return
 		} else {
 			currentFPS = fps
